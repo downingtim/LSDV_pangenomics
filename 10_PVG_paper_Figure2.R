@@ -97,15 +97,12 @@ tree_plot <- ggplot(bin_counts, aes(x = midpoint, y = count)) +
   geom_hline(yintercept = median_val, linetype = "dashed", color = "red", alpha = 0.5) +
   geom_hline(yintercept = top5_val, linetype = "dashed", color = "red", alpha = 0.5) +
   # Customize x-axis with regular breaks and comma formatting
-  scale_x_continuous(name = "Genome Position (bp)",
-                     breaks = seq(0, genome_length, by = 5000),
-                     minor_breaks = seq(0, genome_length, by = 2500),  
-                     labels = comma) +
-  # Set y-axis label
-  scale_y_continuous(name = "Mutations per Kb") +  
-  # Apply minimal theme
-  theme_minimal() +
-  # Customize grid lines
+  scale_x_continuous(name = "Genome Position (Kb)",
+                  breaks = seq(0, genome_length, by = 5000),
+                  minor_breaks = seq(0, genome_length, by = 2500),
+                  labels = seq(0, genome_length, by = 5000) / 1000) +
+  scale_y_continuous(name = "Mutations per Kb") +     # Apply minimal theme
+  theme_minimal() +  # Customize grid lines
   theme(panel.grid.minor = element_line(size = 0.3),
         panel.grid.major = element_line(size = 0.6),
         panel.grid.major.x = element_line(color = "gray70"),
@@ -138,18 +135,17 @@ cds_plot <- ggplot(cds_data, aes(xmin = start, xmax = end, ymin = 0, ymax = y)) 
   # Add horizontal line at y=0 to separate strands
   geom_hline(yintercept = 0, color = "black", linewidth = 0.4) +
   # Apply minimal theme with smaller base font size
-  theme_minimal(base_size = 11) +
-  # Set axis labels
+  theme_minimal(base_size = 11) +   # Set axis labels
   labs(x = "Genome Position (bp)", y = "CDS Strand") +
   # Match x-axis formatting with main plot
-  scale_x_continuous(name = "Genome Position (bp)",
-                     breaks = seq(0, genome_length, by = 5000),
-                     minor_breaks = seq(0, genome_length, by = 2500),  
-                     labels = comma) +
-  # Set y-axis with custom labels for strands
+  scale_x_continuous(name = "Genome Position (Kb)",
+                  breaks = seq(0, genome_length, by = 5000),
+                  minor_breaks = seq(0, genome_length, by = 2500),
+                  labels = seq(0, genome_length, by = 5000) / 1000) +
   scale_y_continuous(breaks = c(-1, 1), labels = c("-", "+")) +
   # Customize theme to hide y-axis elements
-  theme(axis.text.y = element_blank(),      # Hide y-axis text
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),      # Hide y-axis text
+        axis.text.y = element_blank(),     # Hide y-axis ticks
         axis.ticks.y = element_blank(),     # Hide y-axis ticks
         axis.title.y = element_blank(),     # Hide y-axis title
         # Match grid formatting with main plot
@@ -167,7 +163,7 @@ cds_plot <- ggplot(cds_data, aes(xmin = start, xmax = end, ymin = 0, ymax = y)) 
 final_plot <- tree_plot / cds_plot + plot_layout(heights = c(4, 1))
 
 # Save combined plot as PDF
-ggsave("PVG_paper_Figure2.pdf", final_plot, width = 16, height = 5)
+ggsave("10_PVG_paper_Figure2.pdf", final_plot, width = 13, height = 4.5)
 
 # =============================================================================
 # SCRIPT COMPLETE
@@ -175,4 +171,4 @@ ggsave("PVG_paper_Figure2.pdf", final_plot, width = 16, height = 5)
 
 # The script has completed successfully. Check the following output files:
 # 1. bin_counts.csv - Contains the raw data for mutation counts per bin
-# 2. PVG_paper_Figure2.pdf - Combined mutation density and CDS annotation plot
+# 2. 10_PVG_paper_Figure2.pdf - Combined mutation density and CDS annotation plot
