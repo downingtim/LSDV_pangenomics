@@ -96,7 +96,7 @@ regions <- data.frame(
   start = c(5000, 7950, 136000),
   end = c(6700, 8360, 141000),
   color = c("#FFA500", "#FFA500", "#FFA500"),  # Orange, Sky Blue, Pale Green
-  label_x = c(5500, 8230, 135800),  # Center positions for labels
+  label_x = c(5500, 8230, 135500),  # Center positions for labels
   label_y = c(max(bin_counts$count) * 0.87,  # Position labels near top
               max(bin_counts$count) * 0.96,
               max(bin_counts$count) * 0.95) )
