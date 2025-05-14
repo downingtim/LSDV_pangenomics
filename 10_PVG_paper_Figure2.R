@@ -110,11 +110,11 @@ tree_plot <- ggplot(bin_counts, aes(x = midpoint, y = count)) +
             aes(x = label_x, y = label_y, label = region, color=color),
             color = "darkorange", fontface = "bold", size = 5,
             inherit.aes = FALSE) +
-  # Customize x-axis with regular breaks and comma formatting
-  scale_x_continuous(name = "Genome Position (bp)",
-                     breaks = seq(0, genome_length, by = 5000),
-                     minor_breaks = seq(0, genome_length, by = 2500),  
-                     labels = comma) + scale_color_identity() + 
+scale_x_continuous(name = "Genome Position (Kb)", 
+                  breaks = seq(0, genome_length, by = 5000),
+                  minor_breaks = seq(0, genome_length, by = 2500),
+                  labels = seq(0, genome_length, by = 5000) / 1000) +
+		  scale_color_identity() + 
   scale_y_continuous(name = "Mutations per Kb") +  
   # Apply minimal theme
   theme_minimal() +
@@ -173,10 +173,10 @@ cds_plot <- ggplot(cds_data, aes(xmin = start, xmax = end, ymin = 0, ymax = y)) 
   # Set axis labels
   labs(x = "Genome Position (bp)", y = "CDS Strand") +
   # Match x-axis formatting with main plot
-  scale_x_continuous(name = "Genome Position (bp)",
-                     breaks = seq(0, genome_length, by = 5000),
-                     minor_breaks = seq(0, genome_length, by = 2500),  
-                     labels = comma) +
+scale_x_continuous(name = "Genome Position (Kb)", 
+                  breaks = seq(0, genome_length, by = 5000),
+                  minor_breaks = seq(0, genome_length, by = 2500),
+                  labels = seq(0, genome_length, by = 5000) / 1000) +
   # Set y-axis with custom labels for strands
   scale_y_continuous(breaks = c(-1, 1), labels = c("-", "+")) +
   # Customize theme to hide y-axis elements
