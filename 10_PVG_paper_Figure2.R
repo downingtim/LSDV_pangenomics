@@ -22,13 +22,8 @@
 # - genome_length: 151,000 bp (total genome length)
 # - window_size: 400 bp (size of bins for density analysis)
 #
-# AUTHOR: [Your name here]
-# DATE: [Current date]
-# VERSION: 1.0
-#
 # =============================================================================
 
-# Load required libraries
 library(VariantAnnotation)  # For reading and processing VCF files
 library(ggplot2)           # For creating plots
 library(dplyr)             # For data manipulation
