@@ -10,9 +10,6 @@
 # of mutations per genomic window alongside a visual representation of coding sequences
 # (CDS) from a GenBank file.
 #
-# The easiest way to generate input data for this script is to run Panalyze:
-# https://github.com/downingtim/LSDV-PVG/
-#
 # INPUT DATA:
 # 1. VCF file: "vcf/gfavariants.vcf" - Contains genetic variants (SNPs, indels, etc.)
 # 2. GenBank file: "KX894508.gb" - Contains genome annotation including CDS features
@@ -24,6 +21,10 @@
 # PARAMETERS:
 # - genome_length: 151,000 bp (total genome length)
 # - window_size: 400 bp (size of bins for density analysis)
+#
+# AUTHOR: [Your name here]
+# DATE: [Current date]
+# VERSION: 1.0
 #
 # =============================================================================
 
@@ -86,27 +87,49 @@ top5_val <- quantile(bin_counts$count, 0.95)  # 95th percentile (top 5%)
 write.csv(bin_counts, "bin_counts.csv")
 
 # =============================================================================
-# CREATE MUTATION DENSITY PLOT
+# CREATE MUTATION DENSITY PLOT WITH HIGHLIGHTED REGIONS
 # =============================================================================
+
+# Define regions of interest to highlight
+regions <- data.frame(
+  region = c("Region1", "Region2", "Region3"),
+  start = c(5000, 7950, 136000),
+  end = c(6700, 8360, 141000),
+  color = c("#FFA500", "#FFA500", "#FFA500"),  # Orange, Sky Blue, Pale Green
+  label_x = c(5500, 8230, 135800),  # Center positions for labels
+  label_y = c(max(bin_counts$count) * 0.87,  # Position labels near top
+              max(bin_counts$count) * 0.96,
+              max(bin_counts$count) * 0.95) )
 
 # Create main plot showing mutation density across genome
 tree_plot <- ggplot(bin_counts, aes(x = midpoint, y = count)) +  
-  # Create bar chart with steelblue bars
+	  geom_rect(data = regions, 
+          aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = color),
+          alpha = 0.3, inherit.aes = FALSE) + scale_fill_identity() +
   geom_col(fill = "steelblue") +
   # Add horizontal reference lines for median and 95th percentile
   geom_hline(yintercept = median_val, linetype = "dashed", color = "red", alpha = 0.5) +
-  geom_hline(yintercept = top5_val, linetype = "dashed", color = "red", alpha = 0.5) +
+  geom_hline(yintercept = top5_val, linetype = "dashed", color = "black", alpha = 0.5) +
+  # Add region labels
+  geom_text(data = regions,
+            aes(x = label_x, y = label_y, label = region, color=color),
+            color = "darkorange", fontface = "bold", size = 5,
+            inherit.aes = FALSE) +
   # Customize x-axis with regular breaks and comma formatting
-  scale_x_continuous(name = "Genome Position (Kb)",
-                  breaks = seq(0, genome_length, by = 5000),
-                  minor_breaks = seq(0, genome_length, by = 2500),
-                  labels = seq(0, genome_length, by = 5000) / 1000) +
-  scale_y_continuous(name = "Mutations per Kb") +     # Apply minimal theme
-  theme_minimal() +  # Customize grid lines
+  scale_x_continuous(name = "Genome Position (bp)",
+                     breaks = seq(0, genome_length, by = 5000),
+                     minor_breaks = seq(0, genome_length, by = 2500),  
+                     labels = comma) + scale_color_identity() + 
+  scale_y_continuous(name = "Mutations per Kb") +  
+  # Apply minimal theme
+  theme_minimal() +
+  # Customize grid lines
   theme(panel.grid.minor = element_line(size = 0.3),
         panel.grid.major = element_line(size = 0.6),
         panel.grid.major.x = element_line(color = "gray70"),
         panel.grid.minor.x = element_line(color = "gray85"))
+
+# Note: Individual density plot creation removed - only combined plot will be generated
 
 # =============================================================================
 # READ AND PROCESS GENBANK ANNOTATION
@@ -125,27 +148,44 @@ cds_data <- gb@cds %>%
          y = ifelse(strand == "+", 1, -1))
 
 # =============================================================================
-# CREATE CDS ANNOTATION PLOT
+# CREATE CDS ANNOTATION PLOT WITH HIGHLIGHTED GENES
 # =============================================================================
+
+# Define genes of interest to highlight (corresponding to the regions above)
+highlighted_genes <- c("LD008", "LD009", "LD011", "LD012",
+                   "LD144", "LD145", "LD146", "LD147")
+
+# Assuming gene names are stored in a column (you may need to adjust this
+# based on your actual GenBank file structure)
+# Add a column to identify highlighted genes
+cds_data <- cds_data %>%
+  mutate(highlight = ifelse(gene %in% highlighted_genes, "orange", "grey50"))
 
 # Create plot showing CDS features
 cds_plot <- ggplot(cds_data, aes(xmin = start, xmax = end, ymin = 0, ymax = y)) +
-  # Draw rectangles for each CDS with outline
-  geom_rect(fill = "grey50", color = "black", linewidth = 0.2) +  
+  # Add orange transparent boxes for regions of interest (same as upper plot)
+  geom_rect(data = regions, 
+            aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
+            fill = "orange", alpha = 0.3, inherit.aes = FALSE) +
+  # Draw rectangles for each CDS with conditional coloring
+  geom_rect(aes(fill = highlight), color = "black", linewidth = 0.2) +  
+  # Add manual color scale for highlighting specific genes
+  scale_fill_identity() +
   # Add horizontal line at y=0 to separate strands
   geom_hline(yintercept = 0, color = "black", linewidth = 0.4) +
   # Apply minimal theme with smaller base font size
-  theme_minimal(base_size = 11) +   # Set axis labels
+  theme_minimal(base_size = 11) +
+  # Set axis labels
   labs(x = "Genome Position (bp)", y = "CDS Strand") +
   # Match x-axis formatting with main plot
-  scale_x_continuous(name = "Genome Position (Kb)",
-                  breaks = seq(0, genome_length, by = 5000),
-                  minor_breaks = seq(0, genome_length, by = 2500),
-                  labels = seq(0, genome_length, by = 5000) / 1000) +
+  scale_x_continuous(name = "Genome Position (bp)",
+                     breaks = seq(0, genome_length, by = 5000),
+                     minor_breaks = seq(0, genome_length, by = 2500),  
+                     labels = comma) +
+  # Set y-axis with custom labels for strands
   scale_y_continuous(breaks = c(-1, 1), labels = c("-", "+")) +
   # Customize theme to hide y-axis elements
-  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),      # Hide y-axis text
-        axis.text.y = element_blank(),     # Hide y-axis ticks
+  theme(axis.text.y = element_blank(),      # Hide y-axis text
         axis.ticks.y = element_blank(),     # Hide y-axis ticks
         axis.title.y = element_blank(),     # Hide y-axis title
         # Match grid formatting with main plot
@@ -163,12 +203,9 @@ cds_plot <- ggplot(cds_data, aes(xmin = start, xmax = end, ymin = 0, ymax = y)) 
 final_plot <- tree_plot / cds_plot + plot_layout(heights = c(4, 1))
 
 # Save combined plot as PDF
-ggsave("10_PVG_paper_Figure2.pdf", final_plot, width = 13, height = 4.5)
+ggsave("PVG_paper_Figure2.pdf", final_plot, width = 16, height = 5)
 
-# =============================================================================
-# SCRIPT COMPLETE
-# =============================================================================
-
-# The script has completed successfully. Check the following output files:
+# Outputs
 # 1. bin_counts.csv - Contains the raw data for mutation counts per bin
-# 2. 10_PVG_paper_Figure2.pdf - Combined mutation density and CDS annotation plot
+# 2. PVG_paper_Figure2.pdf - Combined mutation density and CDS annotation plot
+#    with highlighted regions and genes
