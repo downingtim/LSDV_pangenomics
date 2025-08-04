@@ -148,130 +148,165 @@ The pipeline expects preprocessed FASTQ files in the following locations:
 The pipeline creates the following directory structure:
 
 ```
-├── GAM_FILES/          # vg alignment files (.gam)
-├── GAM_FILES2/         # Temporary augmented alignments
-├── BAM_FILES/          # Standard BAM alignments
-├── AUG/                # Augmented graph files
-├── PACK_FILES/         # vg pileup files
-├── DEPTH_FILES/        # Coverage depth files
-├── VG_VCF_FILES/       # vg variant calls
-├── FB_VCF_FILES/       # FreeBayes variant calls
-├── BCF_VCF_FILES/      # BCFtools variant calls
-├── CONSENSUS/          # Consensus sequences
-├── COVERAGE/           # Coverage statistics
-├── QUALIMAP/           # Quality assessment reports
-└── ERROR_FILES/        # Error logs and diagnostics
+project_directory/
+├── GAM_FILES/          # vg alignment files (.gam, .stat)
+├── GAM_FILES2/         # Temporary augmented alignment files
+├── BAM_FILES/          # BAM alignment files and statistics
+├── AUG/                # Augmented graph files (.aug, .snarls)
+├── PACK_FILES/         # Pileup files (.pack)
+├── DEPTH_FILES/        # Depth calculation results (.depth.csv)
+├── VG_VCF_FILES/       # vg variant calls (.vg.vcf.gz, .norm.vg.vcf.gz)
+├── FB_VCF_FILES/       # FreeBayes variant calls (.fb.vcf.gz, .norm.fb.vcf.gz)
+├── BCF_VCF_FILES/      # BCFtools variant calls (.bcf.vcf.gz, .norm.bcf.vcf.gz)
+├── CONSENSUS/          # Consensus sequences (.LA.fasta, .LR.fasta)
+├── COVERAGE/           # Coverage statistics (.coverage.txt)
+├── QUALIMAP/           # Quality assessment reports (HTML)
+└── ERROR_FILES/        # Error logs and debugging information
 ```
 
 ### Key Output Files
 
 | File Type | Location | Description |
 |-----------|----------|-------------|
-| **Variants (normalized)** | `VG_VCF_FILES/{sample}.norm.vg.vcf.gz` | Graph-based variants |
-| | `FB_VCF_FILES/{sample}.norm.fb.vcf.gz` | FreeBayes variants |
-| | `BCF_VCF_FILES/{sample}.norm.bcf.vcf.gz` | BCFtools variants |
-| **Consensus** | `CONSENSUS/{sample}.LA.fasta` | Reference allele consensus |
-| | `CONSENSUS/{sample}.LR.fasta` | Alternate allele consensus |
-| **Quality Metrics** | `BAM_FILES/{sample}.flagstat` | Alignment statistics |
-| | `COVERAGE/{sample}.coverage.txt` | Coverage statistics |
-| | `QUALIMAP/{sample}/` | Detailed QC reports |
-| **Logs** | `ERROR_FILES/{sample}.*.errors.txt` | Process error logs |
+| **Alignment Statistics** | `GAM_FILES/{sample}.stat` | vg mapping statistics |
+| **BAM Statistics** | `BAM_FILES/{sample}.flagstat` | Standard alignment statistics |
+| **Coverage Report** | `COVERAGE/{sample}.coverage.txt` | Per-base coverage information |
+| **vg Variants** | `VG_VCF_FILES/{sample}.norm.vg.vcf.gz` | Normalized graph-based variants |
+| **FreeBayes Variants** | `FB_VCF_FILES/{sample}.norm.fb.vcf.gz` | Normalized FreeBayes variants |
+| **BCFtools Variants** | `BCF_VCF_FILES/{sample}.norm.bcf.vcf.gz` | Normalized BCFtools variants |
+| **Reference Consensus** | `CONSENSUS/{sample}.LA.fasta` | Reference allele consensus |
+| **Alternate Consensus** | `CONSENSUS/{sample}.LR.fasta` | Alternate allele consensus |
+| **Quality Report** | `QUALIMAP/{sample}/qualimapReport.html` | Detailed quality metrics |
 
-## Quality Control and Validation
+## Pipeline Stages
 
-### Built-in QC Steps
+### Stage 0: Index Preparation (One-time setup)
+- Build pangenome graphs using pggb
+- Create vg indices (.xg, .gcsa, .pg files)
+- Index reference FASTA files
 
-1. **Input file validation**: Checks for existence of required FASTQ files
-2. **BAM validation**: samtools quickcheck verification
-3. **Mapping statistics**: Detailed alignment metrics via vg stats
-4. **Coverage analysis**: Per-base coverage calculations
-5. **Quality assessment**: Optional Qualimap reports for detailed QC
+### Stage 1: Quality Control
+- Validate input files
+- Check file integrity
 
-### Interpreting Results
+### Stage 2: Read Mapping
+- Map reads to pangenome graph using vg map
+- Generate mapping statistics
+- Support for both paired-end and single-end data
 
-**Mapping Quality Indicators:**
-- Check `GAM_FILES/{sample}.stat` for alignment statistics
-- Review `BAM_FILES/{sample}.flagstat` for standard alignment metrics
-- Examine `COVERAGE/{sample}.coverage.txt` for coverage distribution
+### Stage 3: BAM Processing
+- Convert graph alignments to BAM format
+- Sort and process BAM files
+- Remove duplicates and generate indices
+- Calculate coverage statistics
 
-**Variant Quality Assessment:**
-- Compare SNP counts between different callers
-- Higher concordance between methods indicates higher confidence
-- Graph-based calling (vg) may identify variants missed by traditional methods
+### Stage 4: Graph-based Variant Calling (vg)
+- Augment graph with sample-specific variants
+- Compute snarls (variation sites)
+- Call variants using graph structure
+- Normalize and index variants
+
+### Stage 5: Traditional Variant Calling (FreeBayes)
+- Call variants from BAM alignments
+- Apply quality filters
+- Normalize variants
+
+### Stage 6: Traditional Variant Calling (BCFtools)
+- Call variants using mpileup approach
+- Assume haploid genome (--ploidy 1)
+- Normalize variants
+
+### Stage 7: Analysis and Consensus
+- Count variants from each method
+- Generate consensus sequences
+- Compare variant calling approaches
+
+## Configuration Options
+
+### Resource Scaling
+
+The pipeline automatically adjusts resource usage based on reference type:
+
+- **Thread allocation**: 22 threads for most references, 29 for 121-genome set
+- **Tool paths**: Automatically selects appropriate bgzip/tabix versions
+- **Memory management**: Cleans up intermediate files to manage disk space
+
+### Quality Parameters
+
+Key quality thresholds used in the pipeline:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Mapping quality | ≥10 | Minimum mapping quality for variant calling |
+| Base quality | ≥10 | Minimum base quality for variant calling |
+| Coverage | ≥3 | Minimum coverage for graph augmentation |
+| Alternate fraction | ≥0.001 | Minimum alternate allele fraction (FreeBayes) |
+| Alternate count | ≥1 | Minimum alternate allele count (FreeBayes) |
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"No valid input files found"**
-   - Verify FASTQ files exist in expected directory
-   - Check file naming convention matches expected pattern
-   - Ensure files are accessible and not corrupted
+1. **Missing input files**
+   ```bash
+   # Check if files exist
+   ls -la /mnt/lustre/RDS-archive/downing/LSDV/KRAKEN_VALID_FILES/{sample}_*_fastp.fastq
+   ```
 
-2. **"Reference type must be 1, 3, 6, or 121"**
-   - Use only supported reference types
-   - Check command line argument syntax
+2. **Index files not found**
+   ```bash
+   # Verify index files exist
+   ls -la LSDV*.{xg,gcsa,pg}
+   ```
 
-3. **Memory/Resource Issues**
-   - Increase memory allocation for larger reference sets
-   - Use appropriate SLURM resource parameters
-   - Monitor job resource usage
+3. **Memory issues**
+   ```bash
+   # Increase memory allocation for large genome sets
+   sbatch -c 50 --mem=500G -J sample.job run.sh sample 121
+   ```
 
-4. **Index Files Missing**
-   - Ensure reference indices are built before running pipeline
-   - Check that .xg, .gcsa, and .pg files exist for chosen reference
-   - Verify file permissions and accessibility
+4. **Permission errors**
+   ```bash
+   # Check file permissions
+   chmod +x run.sh
+   chmod 755 /path/to/tools/*
+   ```
 
-### Debugging
+### Log Files
 
-**Enable verbose logging:**
-```bash
-# Add debug flag to script
-set -x  # Add this line near the top of run.sh
-```
+Check error logs in the `ERROR_FILES/` directory:
 
-**Check error logs:**
-```bash
-# Review specific error files
-ls ERROR_FILES/
-cat ERROR_FILES/{sample}.*.errors.txt
-```
+- `{sample}.gam.errors.txt` - Mapping errors
+- `{sample}.vg.errors.txt` - vg variant calling errors
+- `{sample}.fb.errors.txt` - FreeBayes errors
+- `{sample}.cov.errors.txt` - Coverage calculation errors
 
-**Validate intermediate files:**
-```bash
-# Check BAM file integrity
-samtools quickcheck -v BAM_FILES/{sample}.rmdup.sorted.bam
+### Performance Optimization
 
-# Verify VCF files
-bcftools stats VG_VCF_FILES/{sample}.norm.vg.vcf.gz
-```
+1. **Disk I/O**: Use local scratch space for temporary files
+2. **Parallelization**: Adjust thread counts based on available cores
+3. **Memory**: Monitor memory usage and adjust allocations
+4. **Storage**: Clean up intermediate files regularly
 
-## Performance Optimization
+## Validation and Quality Control
 
-### For Large-Scale Analysis
+### Expected Outputs
 
-1. **Parallel Processing**: Submit multiple samples simultaneously
-2. **Resource Tuning**: Adjust CPU/memory based on reference size
-3. **Storage Optimization**: Use fast local storage for temporary files
-4. **Cleanup Strategy**: Remove intermediate files to save space
+After successful completion, verify:
 
-### Example Batch Processing Script
+1. **Variant counts are reasonable** (typically 10-1000s variants per sample)
+2. **Coverage statistics** are within expected ranges
+3. **Error logs** contain no critical failures
+4. **VCF files** are properly formatted and indexed
 
-```bash
-#!/bin/bash
-# batch_submit.sh - Process all samples with optimal resource allocation
+### Quality Metrics
 
-SAMPLE_LIST="acc_list.txt"
-REF_TYPE=3
+Key metrics to monitor:
 
-while read sample; do
-    echo "Submitting $sample..."
-    sbatch -c 40 --mem=250G -J ${sample}.job \
-           --time=12:00:00 --partition=compute \
-           run.sh $sample $REF_TYPE
-    sleep 1  # Prevent overwhelming job scheduler
-done < $SAMPLE_LIST
-```
+- **Mapping rate**: Percentage of reads successfully mapped
+- **Mean coverage**: Average coverage across the genome
+- **Variant quality scores**: Distribution of variant confidence
+- **Duplicate rate**: Percentage of duplicate reads removed
 
 ## Citation
 
@@ -286,29 +321,13 @@ If you use this pipeline in your research, please cite:
 }
 ```
 
-### Dependencies to Cite
-
-- **vg toolkit**: Garrison et al. (2018) Nature Biotechnology
-- **FreeBayes**: Garrison & Marth (2012) arXiv preprint
-- **BCFtools**: Danecek et al. (2021) GigaScience
-- **SAMtools**: Li et al. (2009) Bioinformatics
-
 ## Contributing
-
-We welcome contributions! Please:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow shell scripting best practices
-- Add comments for complex operations
-- Test with different reference types
-- Update documentation for new features
 
 ## License
 
@@ -318,19 +337,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For questions, issues, or feature requests:
 
-- **GitHub Issues**: [Create an issue](https://github.com/yourusername/lsdv-variant-pipeline/issues)
-- **Documentation**: Check this README and script comments
+- **Issues**: Open an issue on GitHub
+- **Documentation**: Check the wiki for detailed examples
 - **Email**: [your.email@institution.edu]
 
-## Changelog
+## Acknowledgments
 
-### Version 1.0.0 (2024-XX-XX)
-- Initial release
-- Unified pipeline supporting 1, 3, 6, and 121 genome references
-- Multi-method variant calling (vg, FreeBayes, BCFtools)
-- Comprehensive quality control and reporting
-- SLURM integration for HPC environments
+- vg development team for the graph-based variant calling toolkit
+- FreeBayes and BCFtools development teams
+- PGGB developers for pangenome graph construction
+- The LSDV research community
 
 ---
 
-**Note**: This pipeline was developed for LSDV research but can be adapted for other viral genomics projects with appropriate reference modifications.
+**Last updated**: August 2025  
+**Version**: 1.0.0
