@@ -1,223 +1,181 @@
-# 
+#!/usr/bin/env perl
+#
+# PURPOSE: Parses VCF, BAM, and GAM files from a specified directory structure
+#          to extract SNP counts and alignment metrics.
+#
+# USAGE:
+# perl 02_BAM_GAM_metrics.pl --datadir /path/to/LSDV_data \
+#                           --outdir ./metrics_output
+#
+# DESCRIPTION:
+# This script is a rewritten version to be portable. It replaces hard-coded paths
+# with command-line arguments. It expects the --datadir to contain subfolders
+# for each mapping strategy (e.g., LSDV1, LSDVG, LSDVVG_ALL) and that these
+# subfolders contain the VCF_FILES, BAM_FILES, and GAM_FILES directories.
 
-open(ALL, "ls /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDV*/*_VCF_FILES/*norm*vcf*z | grep -v \"SRR10394925t\" | grep -v \"255939\" | grep -v \"23347779 \" | grep -v FINAL | "); # all files
+use strict;
+use warnings;
+use Getopt::Long;
+use File::Spec;
+use File::Path qw(make_path);
 
-open(META,"acc_list.metagenomic.txt");
-@a3=<META>;
-%h3={};
-for $e (0..$#a3){ chomp($a3[$e]);    $h3{$a3[$e]}=1; }
-close(META);
-open(SNPS3, ">./SNPS.METAGENOMIC.txt");
-open(B3, ">./BAMSTATS.METAGENOMIC.txt");
-open(G3, ">./GAMSTATS.METAGENOMIC.txt");
+# --- Command Line Argument Parsing ---
+my $data_dir;
+my $out_dir = '.';
+GetOptions(
+    'datadir=s' => \$data_dir,
+    'outdir=s'  => \$out_dir
+) or die "Error in command line arguments\n";
 
-open(W,"acc_list.wgs.txt");
-@a4=<W>;
-%h4={};
-for $e (0..$#a4){ chomp($a4[$e]);    $h4{$a4[$e]}=1; }
-close(W);
-open(SNPS4, ">./SNPS.WGS.txt");
-open(B4, ">./BAMSTATS.WGS.txt");
-open(G4, ">./GAMSTATS.WGS.txt");
+die "Usage: $0 --datadir /path/to/data --outdir /path/to/output\n" unless $data_dir;
 
-open(AMP,"acc_list.amplicon.txt");
-@a22=<AMP>;
-%h22={};
-for $e (0..$#a22){ chomp($a22[$e]);    $h22{$a22[$e]}=1; }
-close(AMP);
-open(SNPS22, ">./SNPS.AMPLICON.txt");
-open(B22, ">./BAMSTATS.AMPLICON.txt");
-open(G22, ">./GAMSTATS.AMPLICON.txt");
+# Create output directory if it doesn't exist
+make_path($out_dir) unless -d $out_dir;
+print "Data directory: $data_dir\n";
+print "Output directory: $out_dir\n";
 
-print B1 "Sample\tSource\tRate\n";
-print B2 "Sample\tSource\tRate\n";
-print B22 "Sample\tSource\tRate\n";
-print B3 "Sample\tSource\tRate\n";
-print B4 "Sample\tSource\tRate\n";
-print G1 "Sample\tSource\tRate\n";
-print G2 "Sample\tSource\tRate\n";
-print G22 "Sample\tSource\tRate\n";
-print G3 "Sample\tSource\tRate\n";
-print G4 "Sample\tSource\tRate\n";
+# --- Helper Functions ---
+# Safely read a list of samples from a file
+sub read_sample_list {
+    my ($file) = @_;
+    my %samples;
+    open(my $fh, '<', $file) or die "Cannot open sample list $file: $!";
+    while (my $line = <$fh>) {
+        chomp $line;
+        $samples{$line} = 1;
+    }
+    close $fh;
+    return \%samples;
+}
 
-while(<ALL>){
-    chomp;
-    @r=split/\//,$_;
-    $r[7]=~ s/_VCF_FILES//g;
-    @z=split/\./,$r[8];
+# --- Load Sample Lists ---
+# Note: These files must exist in the directory where the script is run.
+my $wgs_samples        = read_sample_list('acc_list.wgs.txt');
+my $metagenomic_samples = read_sample_list('acc_list.metagenomic.txt');
+my $amplicon_samples   = read_sample_list('acc_list.amplicon.txt');
+my $ont_samples        = read_sample_list('acc_list.ont.txt');
+
+# --- Open Output Files ---
+my %out_files;
+my @categories = ('WGS', 'METAGENOMIC', 'AMPLICON', 'ONT');
+my @stat_types = ('SNPS', 'BAMSTATS', 'GAMSTATS');
+
+foreach my $cat (@categories) {
+    foreach my $stat (@stat_types) {
+        my $filename = File::Spec->catfile($out_dir, "$stat.$cat.txt");
+        open(my $fh, '>', $filename) or die "Cannot open output file $filename: $!";
+        $out_files{"${stat}_${cat}"} = $fh;
+    }
+}
+
+# --- Process VCF Files for SNP Counts ---
+print "Processing VCF files for SNP counts...\n";
+my @vcf_files = glob("$data_dir/LSDV*/*_VCF_FILES/*norm*vcf*gz");
+
+foreach my $file (@vcf_files) {
+    # Skip excluded files
+    next if $file =~ /SRR10394925t|255939|23347779|FINAL/;
+
+    my @parts = File::Spec->splitdir($file);
+    my $mapper_dir = $parts[-3]; # e.g., LSDVG_3
+    my ($sample_name) = $parts[-1] =~ /^(.*?)\./;
+
+    # Run command to count SNPs
+    my $snp_count = `gzip -dc "$file" | grep -vc "^#"`;
+    chomp $snp_count;
+
+    # Determine sample type and write to correct file
+    my $fh;
+    if ($wgs_samples->{$sample_name}) {
+        $fh = $out_files{'SNPS_WGS'};
+    } elsif ($metagenomic_samples->{$sample_name}) {
+        $fh = $out_files{'SNPS_METAGENOMIC'};
+    } elsif ($amplicon_samples->{$sample_name}) {
+        $fh = $out_files{'SNPS_AMPLICON'};
+    } elsif ($ont_samples->{$sample_name}) {
+        $fh = $out_files{'SNPS_ONT'};
+    }
+
+    if ($fh) {
+        # Format: Sample  Mapper  Rate
+        print $fh "$sample_name\t$mapper_dir\t$snp_count\n";
+    }
+}
+
+# --- Process BAM Files for Mapping Stats ---
+print "Processing BAM flagstat files...\n";
+my @bam_files = glob("$data_dir/LSDV*/*_FILES*/*flagstat");
+
+foreach my $file (@bam_files) {
+    next if $file =~ /SRR10394925t|255939|23347779|FINAL/;
+
+    my @parts = File::Spec->splitdir($file);
+    my $mapper_dir = $parts[-3];
+    my ($sample_name) = $parts[-1] =~ /^(.*?)\.flagstat/;
+
+    my $mapped_line = `grep "mapped (" "$file"`;
+    next unless $mapped_line;
+    my ($rate) = $mapped_line =~ /\((\d+\.\d+)\% :/;
     
-    $comm=`gzip -dc $_ | awk ' { print \$2 } ' | sort | uniq | grep -c -v "#" > temp.illumina `;
-    open(HIT2, "temp.illumina");
-    $in2 =<HIT2>;
-    @r2=split/\//,$_;
-    $r2[7]=~ s/_VCF_FILES//g;
-    @z=split/\./,$r2[8];
-
-    if($h{$z[0]}) {  # if in amplicon PE      # print "$z[0] -> $h{$z[0]}\n";
-	print OS1 "$z[0]\t$r[7]\t$r[6]\t$in2[4]\t$in2";
-        print SNPS1 "$z[0]\t$r2[7]\t$r2[6]\t$in2";  } 
-    elsif($h2{$z[0]}) {  # if in amplicon SE
-	print OS2 "$z[0]\t$r[7]\t$r[6]\t$in2[4]\t$in2";
-        print SNPS2 "$z[0]\t$r2[7]\t$r2[6]\t$in2";  } 
-    elsif($h3{$z[0]}) {  # if metagenomic
-	print OS3 "$z[0]\t$r[7]\t$r[6]\t$in2[4]\t$in2";
-        print SNPS3 "$z[0]\t$r2[7]\t$r2[6]\t$in2";  } 
-    elsif($h4{$z[0]}) {  # if wgs
-	print OS4 "$z[0]\t$r[7]\t$r[6]\t$in2[4]\t$in2";
-        print SNPS4 "$z[0]\t$r2[7]\t$r2[6]\t$in2";  } 
-
-    if($h22{$z[0]}) {  # if in amplicon SE
-	print OS22 "$z[0]\t$r[7]\t$r[6]\t$in2[4]\t$in2";
-        print SNPS22 "$z[0]\t$r2[7]\t$r2[6]\t$in2";  } 
-    close(HIT);
-    close(HIT2);
-}
-close(ALL);
-close(OUT);
-close(SNPS1);
-close(SNPS2);
-close(SNPS22);
-close(SNPS3);
-close(SNPS4);
-close(OS1);
-close(OS2);
-close(OS22);
-close(OS3);
-close(OS4);
-
-# also: cat SNPS.AMPLICON.SE.txt SNPS.AMPLICON.PE.txt SNPS.WGS.txt SNPS.METAGENOMIC.txt > SNPS.ILLUMINA.txt
-
-open(BAM, "ls /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDVV*/BAM_FILE*/*flagstat /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDVG*/BAM_FILE*/*flagstat /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDV1/BAM_FILES2/*flagstat | grep -v \"SRR10394925t\" | grep -v \"255939\" | grep -v \"23347779 \"  | grep -v FINAL | "); # all files
-
-while(<BAM>){
-    chomp;
-    open(TT, "grep mapped $_ | grep \% | ");
-    @x=split/\//,$_;
-    $x[8]=~ s/.flagstat//g;
-    @a=<TT>;
-    chomp($a[0]);
-    @r=split/\s+/,$a[0];
-    $r[4]=~ s/\(//g;
-    $r[4]=~ s/\%//g;
-  #  if($x[7]=~ /S2/){ $x[6]=""; $x[8]=""; $r[4]="";}     else { 
-    if($h{$x[8]}) {  # if in amplicon PE     
-    # print "$z[0] -> $h{$z[0]}\n";
-	print B1 "$x[8]\t$x[6]\t$r[4]\n"; }
-    elsif($h2{$x[8]}) {  # if in amplicon SE
-	print B2 "$x[8]\t$x[6]\t$r[4]\n"; }
-    elsif($h3{$x[8]}) {  # if metagenomic
-	print B3 "$x[8]\t$x[6]\t$r[4]\n"; }
-    elsif($h4{$x[8]}) {  # if wgs
-	print B4 "$x[8]\t$x[6]\t$r[4]\n"; }# }
-
-    if($h22{$x[8]}) {  # if in amplicon 
-	     print B22 "$x[8]\t$x[6]\t$r[4]\n"; }
-    close(TT);
+    my $fh;
+    if ($wgs_samples->{$sample_name}) {
+        $fh = $out_files{'BAMSTATS_WGS'};
+    } elsif ($metagenomic_samples->{$sample_name}) {
+        $fh = $out_files{'BAMSTATS_METAGENOMIC'};
+    } elsif ($amplicon_samples->{$sample_name}) {
+        $fh = $out_files{'BAMSTATS_AMPLICON'};
+    } elsif ($ont_samples->{$sample_name}) {
+        $fh = $out_files{'BAMSTATS_ONT'};
+    }
+    
+    if ($fh) {
+        print $fh "$sample_name\t$mapper_dir\t$rate\n";
+    }
 }
 
-open(GAM, "ls /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDVG*/GAM_FILES/*stat  /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDVVG*/GAM_FILES/*stat| grep -v \"SRR10394925t\" | grep -v \"255939\" | grep -v \"23347779 \"  | "); # all files
+# --- Process GAM Files for Alignment Stats ---
+print "Processing GAM stat files...\n";
+my @gam_files = glob("$data_dir/LSDV*/*_FILES*/*stat");
 
-while(<GAM>){
-    chomp;
-    @x=split/\//,$_;
-    $x[8]=~ s/.stat//g;
+foreach my $file (@gam_files) {
+    next if $file =~ /\.flagstat$/; # Skip flagstat files from BAM processing
+    next if $file =~ /SRR10394925t|255939|23347779/;
+    
+    my @parts = File::Spec->splitdir($file);
+    my $mapper_dir = $parts[-3];
+    my ($sample_name) = $parts[-1] =~ /^(.*?)\.stat/;
 
-    open(TT, "grep aligne $_ | ");
-    @a=<TT>;
-    chomp($a[0]);
-    @r=split/\s+/,$a[0];
-    close(TT);
-    open(TT2, "grep primary $_ | ");
-    @a2=<TT2>;
-    chomp($a2[0]);
-    @r2=split/\s+/,$a2[0];
-    close(TT2);
+    my $aligned_line = `grep "aligned" "$file"`;
+    my $primary_line = `grep "primary" "$file"`;
+    next unless $aligned_line && $primary_line;
 
-    if($h{$x[8]}) {  # if in amplicon PE      # print "$z[0] -> $h{$z[0]}\n";
-        print G1 "\n$x[8]\t$x[6]\t";
-          if(($r[2]>0)&&($r2[2])){ print G1 sprintf("%.2f", (100*$r[2])/$r2[2]); }
-	else { print G1 "NA"; } }
-    elsif($h2{$x[8]}) {  # if in amplicon SE
-        print G2 "\n$x[8]\t$x[6]\t";
-          if(($r[2]>0)&&($r2[2])){ print G2 sprintf("%.2f", (100*$r[2])/$r2[2]); }
-	else { print G2 "NA"; } }
-    elsif($h3{$x[8]}) {  # if metagenomic
-        print G3 "\n$x[8]\t$x[6]\t";
-          if(($r[2]>0)&&($r2[2])){ print G3 sprintf("%.2f", (100*$r[2])/$r2[2]); }
-	else { print G3 "NA"; } }
-    elsif($h4{$x[8]}) {  # if wgs
-        print G4 "\n$x[8]\t$x[6]\t";
-          if(($r[2]>0)&&($r2[2])){ print G4 sprintf("%.2f", (100*$r[2])/$r2[2]); }
-	else { print G4 "NA"; } }
+    my ($aligned_count) = $aligned_line =~ /(\d+)\s+aligned/;
+    my ($primary_count) = $primary_line =~ /(\d+)\s+primary/;
 
-    if($h22{$x[8]}) {  # if in amplicon 
-        print G22 "\n$x[8]\t$x[6]\t";
-          if(($r[2]>0)&&($r2[2])){ print G22 sprintf("%.2f", (100*$r[2])/$r2[2]); }
-	else { print G22 "NA"; } }
+    my $rate = 'NA';
+    if ($primary_count > 0) {
+        $rate = sprintf("%.2f", (100 * $aligned_count) / $primary_count);
+    }
 
-    close(TT); }
+    my $fh;
+    if ($wgs_samples->{$sample_name}) {
+        $fh = $out_files{'GAMSTATS_WGS'};
+    } elsif ($metagenomic_samples->{$sample_name}) {
+        $fh = $out_files{'GAMSTATS_METAGENOMIC'};
+    } elsif ($amplicon_samples->{$sample_name}) {
+        $fh = $out_files{'GAMSTATS_AMPLICON'};
+    } elsif ($ont_samples->{$sample_name}) {
+        $fh = $out_files{'GAMSTATS_ONT'};
+    }
 
-# FB ONT only #ls  FB_VCF_FILES/*.norm*vcf.gz | grep -E "255939|23347779" | 
-
-open(ONT, "ls /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDVV*/*VCF_FILES/*norm*vcf*z /mnt/lustre/RDS-ephemeral/downing/LSDV/LSDVG*/*VCF_FILES/*norm*vcf*z | grep -v \"SRR10394925t\" | grep -E \"255939|23347779 \" | "); # all files
-open(ONT2, ">./SNPS.ONT.txt");
-
-while(<ONT>){
-    chomp;
-    $comm=`gzip -dc $_ | awk ' { print \$2 } ' | sort | uniq | grep -c -v "#" > temp.ont `;
-    open(HIT, "temp.ont");
-    $in =<HIT>;
-    @r=split/\//,$_;
-    $r[7]=~ s/_VCF_FILES//g;
-    @z=split/\./,$r[8];
-    print ONT2 "$z[0]\t$r[7]\t$r[6]\t$in"; 
-}
-close(ONT1);
-close(ONT2);
-
-open(INTO, "acc_list.ont.txt");
-open(O, ">./BAMSTATS.ONT.txt");
-open(O2, ">./GAMSTATS.ONT.txt");
-print O  "Sample\tSource\tRate\n";
-print O2 "Sample\tSource\tRate\n";
-
-@xx=<INTO>;
-@type=qw(LSDVVG LSDV1 LSDV1_3 LSDV1_6 LSDV1_ALL LSDVG LSDVVG_3 LSDVG_3 LSDVVG_6 LSDVG_6 LSDVVG_ALL LSDVG_ALL );
-
-for $e (0..$#xx){
-      chomp($xx[$e]);
-      for $type1 (0..$#type){
-          $name = "/mnt/lustre/RDS-e*/downing/LSDV/".$type[$type1]."/BAM_FILES/".$xx[$e].".flagstat";
-          open(TT, "grep mapped $name | grep \% | ");
-          @a=<TT>;
-          chomp($a[0]);
-          @r=split/\s+/,$a[0];
-          $r[4]=~ s/\(//g;
-          $r[4]=~ s/\%//g;
-          print O "$xx[$e]\t$type[$type1]\t$r[4]\n";
-          close(TT);      }
+    if ($fh) {
+        print $fh "$sample_name\t$mapper_dir\t$rate\n";
+    }
 }
 
-for $e (0..$#xx){
-      chomp($xx[$e]);
-      for $type1 (0..$#type){
-          $name = "/mnt/lustre/RDS-e*/downing/LSDV/".$type[$type1]."/GAM_FILES/".$xx[$e].".stat";
-          open(TT, "grep aligne $name | ");
-          @a=<TT>;
-          chomp($a[0]);
-          @r=split/\s+/,$a[0];
-          close(TT);
-          open(TT2, "grep primary $name | ");
-          @a2=<TT2>;
-          chomp($a2[0]);
-          @r2=split/\s+/,$a2[0];
-          close(TT2);
-          print O2 "$xx[$e]\t$type[$type1]\t";
-          if(($r[2]>0)&&($r2[2])){ print O2 sprintf("%.2f", (100*$r[2])/$r2[2]); }
-          else { print OUT2 "NA"; }
-          print O2 "\n";      }
+# --- Close All File Handles ---
+foreach my $key (keys %out_files) {
+    close($out_files{$key});
 }
 
-close(INTO);
-close(O);
-close(O2);
+print "Script finished successfully. Metrics written to '$out_dir'.\n";
