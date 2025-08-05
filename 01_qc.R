@@ -63,7 +63,7 @@ for (folder in subfolders) {
           Folder = folder
         ) %>%
         group_by(rname, Sample, Folder) %>%
-        summarize(across(c(depth, BQ, MQ), sum, na.rm = TRUE), .groups = 'drop')
+        summarise(across(c(depth, BQ, MQ), sum, na.rm = TRUE), .groups = 'drop')
       
       coverage_data[[paste0(folder, "_", sample)]] <- cov_data
     }
