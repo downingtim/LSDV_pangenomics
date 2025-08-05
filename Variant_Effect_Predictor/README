@@ -1,0 +1,88 @@
+Variant Effect Predictor
+A tool for predicting the effects of genomic variants on protein-coding genes, focusing on synonymous and nonsynonymous changes.
+
+Overview
+This tool analyzes Variant Call Format (VCF) files to determine the effects of SNPs (Single Nucleotide Polymorphisms) on protein-coding genes. It uses a reference genome (FASTA) and gene annotations (GenBank) to:
+
+Identify if variants fall within coding regions
+Determine if coding variants cause amino acid changes
+Classify variants as:
+Synonymous (no amino acid change)
+Nonsynonymous (amino acid change)
+Stop gain (introducing a premature stop codon)
+Stop loss (removing a stop codon)
+Intergenic (not in a coding region)
+Requirements
+Python 3.6+
+BioPython
+pandas (for batch processing)
+matplotlib and seaborn (for visualization)
+
+Install dependencies:
+ pip install biopython pandas matplotlib seaborn
+
+Usage - Processing a Single VCF File
+ python vep.py INPUT.vcf REFERENCE.fasta ANNOTATION.gbk -o OUTPUT.tsv
+
+Arguments:
+INPUT.vcf: Input variant file in VCF format
+REFERENCE.fasta: Reference genome in FASTA format
+ANNOTATION.gbk: Gene annotation file in GenBank format
+-o, --output: Output file name (default: variant_effects.tsv)
+
+###
+Processing Multiple VCF Files
+
+python batch.py --vcf_dir /path/to/vcfs --fasta REFERENCE.fasta --genbank ANNOTATION.gbk --output_dir results
+
+Arguments:
+--vcf_dir: Directory containing VCF files
+--fasta: Reference genome in FASTA format
+--genbank: Gene annotation file in GenBank format
+--output_dir: Output directory (default: variant_results)
+--pattern: Pattern to match VCF files (default: *.vcf)
+Output Format
+The tool generates a tab-delimited file with the following columns:
+
+CHROM: Chromosome/contig name
+POS: Variant position
+REF: Reference base
+ALT: Alternate base
+EFFECT: Effect type (synonymous, nonsynonymous, stop_gain, stop_loss, intergenic)
+GENE: Gene name
+PRODUCT: Gene product description
+REF_CODON: Reference codon
+ALT_CODON: Alternate codon
+REF_AA: Reference amino acid
+ALT_AA: Alternate amino acid
+CODON_POS: Position in the codon (1-based)
+AA_POS: Amino acid position (1-based)
+Batch Processing Output
+The batch processor generates:
+
+Individual TSV files for each processed VCF
+A combined results file (combined_effects.tsv)
+A summary text file with statistics (variant_summary.txt)
+Visualization plots in the "plots" directory:
+Distribution of variant effects
+Variant effects by sample
+Top affected genes
+
+
+Example - Using the provided test data:
+
+# Process single file
+python vep.py test1.vcf data/KX894508/KX894508.1_155920_2012_Israel_19_Dec_2012.fna data/KX894508/genes.gbk
+
+# Process multiple files
+python batch.py --vcf_dir GIRAFFE_1 --fasta data/KX894508/KX894508.1_155920_2012_Israel_19_Dec_2012.fna --genbank data/KX894508/genes.gbk
+
+Testing with KX894508
+The provided test case uses: The KX894508 genome (Lumpy skin disease virus isolate)
+Gene annotations from genes.gbk
+Variants from test1.vcf
+
+Limitations
+This tool currently only handles simple SNPs (no indels or complex variants)
+Focuses on protein-coding regions (doesn't analyze UTRs, introns, etc.)
+Assumes the GBK and FASTA files are properly aligned
