@@ -2,10 +2,17 @@
 README for Analysis Scripts
 ========================================
 
+<<<<<<< Updated upstream
 This directory contains the core scripts for the LSDV pangenome analysis. They are numbered to suggest a logical order of execution.
+=======
+[![License: MIT](httpshttps://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Pipeline Status](https://img.shields.io/badge/Pipeline-Production-green.svg)](https://github.com/your-org/lsdv-pipeline)
+[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)](https://github.com/your-org/lsdv-pipeline/releases)
+>>>>>>> Stashed changes
 
 These scripts have been revised from their original versions to be more portable, readable, and user-friendly by using command-line arguments instead of hard-coded paths and filenames.
 
+<<<<<<< Updated upstream
 **General Dependencies:** R (with packages optparse, dplyr, ggplot2, etc.), Perl (with Getopt::Long), Python 3, and command-line tools like bcftools and samtools.
 
 ---
@@ -154,10 +161,59 @@ ARGUMENTS:
 -------------------------
 SCRIPT: 12_finalise_snps.R
 -------------------------
+=======
+The LSDV pangenome variation graph (PVG) analysis is a set of workflows designed for analyzing Lumpy Skin Disease Virus (LSDV) sequencing libraries using PVG-based approaches. This repository contains the scripts to perform mapping, variant calling, and generate figures for publication.
+
+## Installation
+
+This pipeline requires Conda for managing dependencies.
+
+1.  Clone the repository (replace `your-username` with your GitHub username or organization):
+    ```bash
+    git clone [https://github.com/your-username/lsdv-pangenomics.git](https://github.com/your-username/lsdv-pangenomics.git)
+    cd lsdv-pangenomics
+    ```
+
+2.  Create the Conda environment from the `environment.yml` file. This file lists all required software.
+    ```bash
+    conda env create -f environment.yml
+    conda activate lsdv-pangenomics
+    ```
+
+## Usage
+
+To run the pipeline, first obtain the necessary input data. An example is provided below.
+
+1.  **Download test data:**
+    ```bash
+    # Add your commands here to download example FASTQ files into a 'data/' directory.
+    # For example:
+    # wget -P data/ [http://example.com/path/to/sample1.fastq.gz](http://example.com/path/to/sample1.fastq.gz)
+    ```
+
+2.  **Run the full pipeline:**
+    ```bash
+    # This example assumes a master script named 'run_pipeline.sh'
+    bash run_pipeline.sh
+    ```
+    Results will be generated in the `results/` directory, which is created automatically if it doesn't exist.
+
+## Workflow Description
+
+The pipeline consists of several numbered scripts executed in sequence:
+
+1.  **`01_quality_control.R`**: Performs quality control on raw reads using FastQC.
+2.  **`02_run_mapping.sh`**: Maps reads to the pangenome graph using `vg giraffe`.
+3.  **`03_process_alignments.sh`**: Sorts and indexes the resulting BAM/GAM files.
+4.  **`04_call_variants.sh`**: Calls SNPs and structural variants from the alignments.
+5.  **`05_annotate_variants.py`**: Annotates variants using Variant Effect Predictor (VEP).
+6.  **`06_generate_figures.R`**: Creates summary plots and figures for publication.
+>>>>>>> Stashed changes
 
 PURPOSE:
 Reads SNP count summary files from script 10 and creates scatter plots comparing SNP counts between Minimap2 and various PVG-based methods.
 
+<<<<<<< Updated upstream
 USAGE:
     Rscript 12_finalise_snps.R --input_dir <path/to/rates_files> --output_dir <path/to/plots>
 
@@ -258,3 +314,6 @@ ARGUMENTS:
 - --vcf_dir: Path to the directory containing final VCF files (e.g., FINAL_SNPS_2/).
 - --unique_snp_dir: Path to the directory containing the "Unique.*.txt" files.
 - --output_pdf: Path for the final composite PDF figure.
+=======
+This project is licensed under the MIT License - see the `LICENSE` file for details.
+>>>>>>> Stashed changes
