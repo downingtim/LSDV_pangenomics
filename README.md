@@ -1,4 +1,4 @@
-# LSDV (Lumpy Skin Disease Virus) Integrated Variant Calling Pipeline
+# LSDV pangenome variation graph (PVG) analysis
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Pipeline Status](https://img.shields.io/badge/Pipeline-Production-green.svg)](https://github.com/your-org/lsdv-pipeline)
@@ -6,7 +6,7 @@
 
 ## Overview
 
-The LSDV Integrated Variant Calling Pipeline is a comprehensive bioinformatics workflow designed for analyzing Lumpy Skin Disease Virus (LSDV) sequencing data. This pipeline supports three different read mapping approaches and multiple reference genome configurations, providing researchers with flexible options for variant discovery and genomic analysis.
+The LSDV pangenome variation graph (PVG) analysis is a set of workflows designed for analyzing Lumpy Skin Disease Virus (LSDV) sequencing libraries using PVG-based approaches. This supports three different read mapping approaches and multiple reference genome configurations, providing researchers with flexible options for variant discovery and genomic analysis.
 
 ### Key Features
 
