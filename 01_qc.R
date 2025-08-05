@@ -1,4 +1,17 @@
-# Required libraries
+#!/usr/bin/env Rscript
+#
+# PURPOSE: Reads raw coverage data from multiple mapping experiments, merges it
+#          with sample metadata, and generates quality control plots.
+#
+# USAGE:
+# Rscript 01_qc.R --samples_list acc_list.sim.no_ont \
+#                 --metadata metadata2.csv \
+#                 --coverage_dir ./ \
+#                 --out_csv coverage_summary.csv \
+#                 --out_prefix qc_plots
+
+# Load required libraries
+library(optparse)
 library(dplyr)
 library(tidyr)
 library(readr)
@@ -6,130 +19,110 @@ library(ggplot2)
 library(RColorBrewer)
 library(ggpubr)
 
-# 1. Read the list of samples
-samples <- readLines("acc_list.sim.no_ont") 
-subfolders <- c("LSDV1", "LSDVG", "LSDVVG",   "LSDVG_3", "LSDVVG_3",
-               "LSDVG_6", "LSDVVG_6",   "LSDVG_ALL", "LSDVVG_ALL") 
-coverage_data <- list() 
+# --- Command Line Argument Parsing ---
+option_list <- list(
+  make_option(c("-s", "--samples_list"), type="character", default=NULL, help="Path to a file with one sample name per line.", metavar="character"),
+  make_option(c("-m", "--metadata"), type="character", default=NULL, help="Path to the metadata CSV/TSV file.", metavar="character"),
+  make_option(c("-c", "--coverage_dir"), type="character", default=".", help="Parent directory containing experiment subfolders (e.g., LSDV1, LSDVG).", metavar="character"),
+  make_option(c("-o", "--out_csv"), type="character", default="coverage_summary.csv", help="Output path for the summary CSV file.", metavar="character"),
+  make_option(c("-p", "--out_prefix"), type="character", default="qc_plots", help="Prefix for the output PDF plot files.", metavar="character")
+)
+
+opt_parser <- OptionParser(option_list=option_list)
+opt <- parse_args(opt_parser)
+
+if (is.null(opt$samples_list) || is.null(opt$metadata)){
+  print_help(opt_parser)
+  stop("Samples list and metadata file must be supplied.", call.=FALSE)
+}
+
+# --- Main Analysis ---
+
+# 1. Read input files
+samples <- readLines(opt$samples_list)
+metadata <- read.csv(opt$metadata, sep="\t", header = FALSE, col.names = c("Sample", "Library_type"))
+
+# Dynamically find experiment subfolders within the coverage directory
+subfolders <- list.dirs(path = opt$coverage_dir, full.names = FALSE, recursive = FALSE)
+# Filter for expected folder names if necessary, for now we use all directories found
+print(paste("Found experiment folders:", paste(subfolders, collapse=", ")))
+
+
+# 2. Loop through folders and samples to read coverage data
+coverage_data <- list()
 for (folder in subfolders) {
-  for (sample in samples) { 
-    file_path <- file.path(folder, "COVERAGE", paste0(sample, ".coverage.txt")) 
-    if (file.exists(file_path)) { 
-      cov_data <- read_tsv(file_path, col_names = T, show_col_types = F)
-      cov_data <- cov_data %>%
+  for (sample in samples) {
+    file_path <- file.path(opt$coverage_dir, folder, "COVERAGE", paste0(sample, ".coverage.txt"))
+    if (file.exists(file_path)) {
+      cov_data <- read_tsv(file_path, col_names = TRUE, show_col_types = FALSE) %>%
         select(rname = `#rname`, meandepth, meanbaseq, meanmapq) %>%
-        rename(depth = meandepth, BQ = meanbaseq, MQ = meanmapq)
-      # Sum data for rname 'KX894507' and 'KX894508' and label them as 'KX894508'
-      cov_data <- cov_data %>%
-        mutate(rname = ifelse(rname == "KX894507", "KX894508", rname)) %>% 
-        group_by(rname) %>%
-        summarize(across(c(depth, BQ, MQ), sum, na.rm = T)) 
-     cov_data <- cov_data %>%
-        mutate(Sample = sample, Folder = folder)
-      coverage_data[[paste0(folder, "_", sample)]] <- cov_data }  
+        rename(depth = meandepth, BQ = meanbaseq, MQ = meanmapq) %>%
+        mutate(
+          rname = ifelse(rname == "KX894507", "KX894508", rname),
+          Sample = sample,
+          Folder = folder
+        ) %>%
+        group_by(rname, Sample, Folder) %>%
+        summarize(across(c(depth, BQ, MQ), sum, na.rm = TRUE), .groups = 'drop')
+      
+      coverage_data[[paste0(folder, "_", sample)]] <- cov_data
+    }
   }
 }
-   
-comparison_data <- bind_rows(coverage_data)
-metadata <- read.csv("metadata2.csv", sep="\t", header = F) 
-colnames(metadata) <- c("Sample", "Library_type") 
-comparison_data <- merge(comparison_data, metadata, by = "Sample", all.x = T)
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVG_3", "Giraffe 3", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVVG_3", "VG-MAP 3", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVG_6", "Giraffe 6", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVVG_6", "VG-MAP 6", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVG_ALL", "Giraffe all", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVVG_ALL", "VG-MAP all", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDV1", "Minimap2", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVG", "Giraffe 1", x) }))
-comparison_data <- data.frame(lapply(comparison_data, function(x) { gsub("LSDVVG", "VG-MAP 1", x) })) 
-comparison_data$depth <- as.numeric( comparison_data$depth)
-comparison_data$BQ <- as.numeric( comparison_data$BQ)
-comparison_data$MQ <- as.numeric( comparison_data$MQ)
-write.csv(comparison_data, "coverage1.csv")
-color_palette <- brewer.pal(3, "Set2")
 
+# 3. Combine and process data
+comparison_data <- bind_rows(coverage_data) %>%
+  merge(metadata, by = "Sample", all.x = TRUE)
 
-comparison_data1<-subset(comparison_data, Folder=="Minimap2" | Folder=="Giraffe 1" | Folder=="VG-MAP 1" | Folder=="Giraffe 3"   | Folder=="VG-MAP 3"| Folder=="Giraffe 6"   | Folder=="VG-MAP 6"  |
-  Folder=="Giraffe all" |Folder=="VG-MAP all"  )
-  
-summed_depths <- comparison_data1 %>%
-  group_by(Folder, Sample ) %>%         # Group by Folder and Sample
-  summarise(total_depth = sum(depth, na.rm = T))
-print(summed_depths %>% group_by(Folder) %>% 
-   summarise(median_depth = median(total_depth) ) )
+# Create a lookup for folder names to make renaming cleaner
+folder_map <- c(
+  "LSDVG_3" = "Giraffe 3", "LSDVVG_3" = "VG-MAP 3",
+  "LSDVG_6" = "Giraffe 6", "LSDVVG_6" = "VG-MAP 6",
+  "LSDVG_ALL" = "Giraffe all", "LSDVVG_ALL" = "VG-MAP all",
+  "LSDV1" = "Minimap2", "LSDVG" = "Giraffe 1", "LSDVVG" = "VG-MAP 1"
+)
+comparison_data$Folder <- folder_map[comparison_data$Folder]
 
-comparison_data1 %>% filter (rname=="KX894508") %>% group_by(Folder, Sample) %>% 
-     group_by(Folder) %>% summarise( BQ = median(BQ))   
-comparison_data1 %>% filter (rname=="KX894508") %>% group_by(Folder, Sample) %>% 
-     group_by(Folder) %>% summarise( MQ = median(MQ)) 
-     
-#  ignore all samples, not useful
-     
-comparison_data1<-subset(comparison_data, Folder=="Minimap2" | Folder=="Giraffe 1" | Folder=="VG-MAP 1" | Folder=="Giraffe 3"   | Folder=="VG-MAP 3"| Folder=="Giraffe 6"   | Folder=="VG-MAP 6"   )
+comparison_data$depth <- as.numeric(comparison_data$depth)
+comparison_data$BQ <- as.numeric(comparison_data$BQ)
+comparison_data$MQ <- as.numeric(comparison_data$MQ)
 
-summed_depths2 <- comparison_data1  %>% 
-  group_by(Folder, Sample, Library_type )  %>% 
-  summarise_at(.vars = vars(depth,BQ,MQ), .funs = c(median="median"))
+# Write summary CSV
+write.csv(comparison_data, opt$out_csv, row.names = FALSE)
+print(paste("Summary data written to:", opt$out_csv))
 
-pdf("Depth_BQ_1.pdf", width=10, height=4)
-ggplot(comparison_data1, aes(x = log10(depth + 1.1), y = BQ, colour = Library_type)) +
-  geom_point(alpha = 0.5, size = 1.1) +    
-  facet_wrap(~Folder, nrow = 1) +   ylim(24, 101) + 
-  labs(x = "Log10-scaled read depth", y = "BQ") +   theme_minimal() + 
-  theme(axis.text.x = element_text(size = 8, angle = 0, hjust = 1),
-        strip.text = element_text(size = 8)) + 
-  scale_fill_manual(values = brewer.pal(7, "Set2")) + 
-  geom_smooth(method = "lm", se =T, color = "grey", linetype = "dashed", alpha = 0.5) + 
+# 4. Generate Plots
+# Subset data for plotting to match original script's logic
+comparison_data1 <- subset(comparison_data, Folder %in% c("Minimap2", "Giraffe 1", "VG-MAP 1", "Giraffe 3", "VG-MAP 3", "Giraffe 6", "VG-MAP 6"))
+
+# Depth vs. BQ
+pdf(paste0(opt$out_prefix, "_Depth_BQ.pdf"), width=10, height=4)
+p_bq <- ggplot(comparison_data1, aes(x = log10(depth + 1.1), y = BQ, colour = Library_type)) +
+  geom_point(alpha = 0.5, size = 1.1) +
+  facet_wrap(~Folder, nrow = 1) +
+  ylim(24, 101) +
+  labs(x = "Log10-scaled read depth", y = "Base Quality (BQ)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 8), strip.text = element_text(size = 8)) +
+  scale_fill_manual(values = brewer.pal(7, "Set2")) +
+  geom_smooth(method = "lm", se = TRUE, color = "grey", linetype = "dashed", alpha = 0.5) +
   stat_cor(aes(label = ..r.label..), method = "pearson", label.x.npc = 'left', label.y.npc = 'top')
-dev.off()
-  
-pdf("Depth_MQ_1.pdf", width=10, height=4)
-ggplot(comparison_data1, aes(x = log10(depth + 1.1), y =MQ, colour = Library_type)) +
-  geom_point(alpha = 0.5, size = 1.1) +    
-  facet_wrap(~Folder, nrow = 1) +    
-  labs(x = "Log10-scaled read depth", y = "MQ") +   theme_minimal() + 
-  theme(axis.text.x = element_text(size = 8, angle = 0, hjust = 1),
-        strip.text = element_text(size = 8)) + 
-  scale_fill_manual(values = brewer.pal(7, "Set2")) + 
-  geom_smooth(method = "lm", se =T, color = "grey", linetype = "dashed", alpha = 0.5) + 
-  stat_cor(aes(label = ..r.label..), method = "pearson", label.x.npc = 'left', label.y.npc = 'top')
+print(p_bq)
 dev.off()
 
+# Depth vs. MQ
+pdf(paste0(opt$out_prefix, "_Depth_MQ.pdf"), width=10, height=4)
+p_mq <- ggplot(comparison_data1, aes(x = log10(depth + 1.1), y = MQ, colour = Library_type)) +
+  geom_point(alpha = 0.5, size = 1.1) +
+  facet_wrap(~Folder, nrow = 1) +
+  labs(x = "Log10-scaled read depth", y = "Mapping Quality (MQ)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 8), strip.text = element_text(size = 8)) +
+  scale_fill_manual(values = brewer.pal(7, "Set2")) +
+  geom_smooth(method = "lm", se = TRUE, color = "grey", linetype = "dashed", alpha = 0.5) +
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x.npc = 'left', label.y.npc = 'top')
+print(p_mq)
+dev.off()
 
-  # Plot for depth
-  pdf("Depth_1.pdf", width=30, height=13)
-   ggplot(comparison_data1, aes(x = Folder, y = depth, fill = rname)) +
-  geom_bar(stat = "identity", position = "stack") +    
-  facet_wrap(~ Library_type + Sample, ncol = 12, scales = "free_y") +   
-  labs(x = "Folder", y = "Mean Read Depth") +   theme_minimal() + 
-  theme( axis.text.x = element_text(size = 6, angle = 90, hjust = 1),
-    strip.text = element_text(size = 8) ) + 
-  scale_fill_manual(values = brewer.pal(6, "Set2")) 
-  dev.off()
-
-  # Plot for BQ
-  pdf( "BQ_1.pdf", width=23, height=33)
-   ggplot(comparison_data1, aes(x = Folder, y = BQ, fill = rname)) +
-  geom_bar(stat = "identity") +    
-  facet_wrap(~ Library_type + Sample +rname, ncol = 24, scales = "free_y") +   
-  labs(x = "Folder", y = "Mean BQ") +   theme_minimal() + 
-  theme( axis.text.x = element_text(size = 5, angle = 90, hjust = 1),
-    strip.text = element_text(size = 5)  ) + 
-  scale_fill_manual(values = brewer.pal(6, "Set2")) 
-  dev.off()
-
-  # Plot for MQ
-  pdf( "MQ_1.pdf", width=23, height=33)
-   ggplot(comparison_data1, aes(x = Folder, y = MQ, fill = rname)) +
-  geom_bar(stat = "identity" ) +    
-  facet_wrap(~ Library_type + Sample +rname, ncol = 24, scales = "free_y") +   
-  labs(x = "Folder", y = "Mean MQ") +   theme_minimal() + 
-  theme( axis.text.x = element_text(size = 5, angle = 90, hjust = 1),
-    strip.text = element_text(size = 5)  ) + 
-  scale_fill_manual(values = brewer.pal(6, "Set2")) 
-  dev.off()
- 
-
-
-
+print("Script finished successfully. Plots are saved with the prefix:")
+print(opt$out_prefix)
