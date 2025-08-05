@@ -1,312 +1,561 @@
-# LSDV_pangenomics
+# LSDV (Lumpy Skin Disease Virus) Integrated Variant Calling Pipeline
 
-LSDV pangenome variation graph analysis, read mapping & interpretation
-
----
-
-## Virus Read Mapping & Variant Calling Pipeline
-
-A comprehensive bioinformatics pipeline for mapping virus (principally Lumpy Skin Disease Virus, LSDV) sequencing reads to reference genomes and calling variants using multiple approaches.
-
----
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Pipeline Status](https://img.shields.io/badge/Pipeline-Production-green.svg)](https://github.com/your-org/lsdv-pipeline)
+[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)](https://github.com/your-org/lsdv-pipeline/releases)
 
 ## Overview
 
-This pipeline supports mapping reads to different reference genome sets (1, 3, 6, or 121 genomes) and performs variant calling using both traditional alignment methods and graph-based approaches. It integrates multiple tools including `minimap2`, `vg` (variation graph), `freebayes`, and `bcftools` to provide comprehensive variant analysis.
+The LSDV Integrated Variant Calling Pipeline is a comprehensive bioinformatics workflow designed for analyzing Lumpy Skin Disease Virus (LSDV) sequencing data. This pipeline supports three different read mapping approaches and multiple reference genome configurations, providing researchers with flexible options for variant discovery and genomic analysis.
 
-### Features
+### Key Features
 
-- **Multi-reference support**: Works with 1, 3, 6, or 121 genome references  
-- **Graph-based analysis**: Includes `vg` (variation graph) support for single genome reference  
-- **Multiple variant callers**: `FreeBayes`, `BCFtools`, and `vg` for comprehensive variant detection  
-- **Quality control**: Integrated `qualimap` and coverage analysis  
-- **SLURM compatibility**: Designed for HPC cluster execution  
-- **Comprehensive output**: BAM files, VCF files, quality reports, and consensus sequences  
+- **Three Mapping Methods**: Minimap2 (linear), VG Giraffe (fast graph-based), and VG Map (comprehensive graph-based)
+- **Multiple Reference Genomes**: Support for 1, 3, 6, or 121 genome references  
+- **Comprehensive Variant Calling**: Integration of VG, FreeBayes, and BCFtools variant callers
+- **Quality Control**: Built-in quality assessment with Qualimap and coverage analysis
+- **Organized Output**: Method and reference-specific directory structure
+- **SLURM Integration**: Ready-to-use batch submission commands
+- **Robust Error Handling**: Comprehensive logging and validation
 
----
+## Table of Contents
 
-## Requirements
-
-### Software Dependencies
-
-**Alignment tools:**
-- `minimap2`
-- `vg` (variation graph toolkit)
-- `samtools` (version 1.9+)
-
-**Variant calling:**
-- `freebayes`
-- `bcftools`
-- `bgzip`
-- `tabix`
-
-**Quality control:**
-- `qualimap` (version 2.2.1+)
-
-**Preprocessing (assumed to be completed):**
-- `fastp` (for read trimming)
-- `kraken` (for validation)
-
----
-
-## System Requirements
-
-- Linux/Unix environment  
-- SLURM workload manager (for cluster execution)  
-- Recommended: 20+ CPU cores, 50GB+ RAM per job  
-
----
-
-## Input Files Structure
-
-The pipeline expects the following directory structure:
-
-```
-/mnt/lustre/RDS-archive/downing/LSDV/
-├── KRAKEN_VALID_FILES/     # Processed FASTQ files
-└── FASTP_FILES/            # Alternative FASTQ location
-```
-
----
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Pipeline Architecture](#pipeline-architecture)
+- [Usage](#usage)
+- [Reference Genome Setup](#reference-genome-setup)
+- [Output Structure](#output-structure)
+- [Variant Calling Methods](#variant-calling-methods)
+- [Batch Processing](#batch-processing)
+- [Troubleshooting](#troubleshooting)
+- [Performance Considerations](#performance-considerations)
+- [Contributing](#contributing)
+- [Citation](#citation)
 
 ## Installation
 
-1. Clone this repository:
+### Prerequisites
 
-   ```bash
-   git clone https://github.com/downingtim/lsdv-pipeline.git
-   cd lsdv-pipeline
-   ```
+The pipeline requires the following software tools:
 
-2. Make the script executable:
+#### Essential Tools
+- **vg toolkit** (≥1.40.0) - For graph-based genomics
+- **minimap2** (≥2.24) - For linear read alignment
+- **samtools** (≥1.9) - For BAM file processing
+- **bcftools** (≥1.15) - For variant calling and processing
+- **bgzip/tabix** - For VCF compression and indexing
+- **freebayes** (≥1.3) - For variant calling
 
-   ```bash
-   chmod +x merged_lsdv_pipeline.sh
-   ```
+#### Optional Tools
+- **qualimap** (≥2.2.1) - For quality assessment
+- **pggb** - For pangenome graph construction
+- **fastp** - For read preprocessing
 
-3. Ensure all dependencies are installed and in your `PATH`.
+#### System Requirements
+- Linux-based system (tested on CentOS 7+, Ubuntu 18.04+)
+- Minimum 16GB RAM (50GB+ recommended for 121-genome reference)
+- 20+ CPU cores recommended for optimal performance
+- Sufficient storage space (varies by dataset size)
 
----
+### Installation Steps
 
-## Reference Genome Setup
-
-### For 1-genome analysis (with `vg` support):
-
+1. **Clone the repository:**
 ```bash
-pggb -i 1genomes.fasta -m -S -o LSDV3 -t 36 -p 90 -s 1k -n 121
-vg convert -t 12 -g LSDV1.gfa -v > LSDV1.vg
-vg autoindex -p LSDV1 -g LSDV1.gfa -t 22
-samtools faidx 1genomes.fasta
-vg convert LSDV1.xg -p > LSDV1.pg
+git clone https://github.com/your-org/lsdv-pipeline.git
+cd lsdv-pipeline
 ```
 
-### For multi-genome analysis
+2. **Make the pipeline executable:**
+```bash
+chmod +x lsdv_integrated_pipeline.sh
+```
 
-Ensure your reference FASTA files are named correctly:
+3. **Install dependencies:**
+```bash
+# Install via conda (recommended)
+conda env create -f environment.yml
+conda activate lsdv-pipeline
 
-- `3genomes.fasta` for 3 genomes  
-- `6genomes.fasta` for 6 genomes  
-- `LSDV_genomes.fasta` for 121 genomes  
+# Or install manually following each tool's documentation
+```
 
----
+4. **Set up reference genomes** (see [Reference Genome Setup](#reference-genome-setup))
 
-## Usage
+## Quick Start
 
 ### Basic Usage
 
-Run for a single sample with 1 genome (default includes vg analysis):
-
 ```bash
-./merged_lsdv_pipeline.sh SampleName
+# Single genome reference with VG Giraffe
+./lsdv_integrated_pipeline.sh SRR11470182 1 giraffe
+
+# 3-genome reference with Minimap2
+./lsdv_integrated_pipeline.sh SRR10394925 3 minimap2
+
+# 121-genome reference with VG Map
+./lsdv_integrated_pipeline.sh SRR12345678 121 vgmap
 ```
 
-Run with a specific reference type:
+### Input File Requirements
 
-```bash
-./merged_lsdv_pipeline.sh SampleName 3genome
-./merged_lsdv_pipeline.sh SampleName 6genome
-./merged_lsdv_pipeline.sh SampleName 121genome
+The pipeline expects preprocessed, quality-trimmed FASTQ files in the following location:
+```
+/mnt/lustre/RDS-archive/downing/LSDV/KRAKEN_VALID_FILES/
 ```
 
-### Batch Processing with SLURM
+File naming convention:
+- **Paired-end**: `{SAMPLE}_1_trim_fastp.fastq` and `{SAMPLE}_2_trim_fastp.fastq`
+- **Single-end**: `{SAMPLE}_trim_fastp.fastq`
 
-Create a sample list file (`acc_list.txt`) with one sample name per line, then:
+## Pipeline Architecture
+
+### Workflow Overview
+
+```mermaid
+graph TD
+    A[Input FASTQ Files] --> B{Read Type}
+    B -->|Paired-end| C[Paired-end Processing]
+    B -->|Single-end| D[Single-end Processing]
+    
+    C --> E{Mapping Method}
+    D --> E
+    
+    E -->|minimap2| F[Linear Alignment]
+    E -->|giraffe| G[Fast Graph Alignment]
+    E -->|vgmap| H[Comprehensive Graph Alignment]
+    
+    F --> I[BAM Processing]
+    G --> I
+    H --> I
+    
+    I --> J[Quality Assessment]
+    J --> K[Variant Calling]
+    K --> L[VCF Normalization]
+    L --> M[Consensus Generation]
+    M --> N[Results Summary]
+```
+
+### Processing Steps
+
+1. **Parameter Validation**: Validate input parameters and file availability
+2. **Directory Setup**: Create method and reference-specific output directories
+3. **Read Mapping**: Perform alignment using selected method
+4. **BAM Processing**: Sort, deduplicate, and index alignments
+5. **Quality Control**: Generate coverage and quality metrics
+6. **Variant Calling**: Call variants using multiple approaches
+7. **Normalization**: Normalize and index VCF files
+8. **Consensus Generation**: Create consensus sequences
+9. **Summary Generation**: Compile results and statistics
+
+## Usage
+
+### Command Syntax
 
 ```bash
-# Process all samples with 1 genome
-more acc_list.txt | perl -e 'while(<>){ chomp; print "sbatch -c 20 --mem=50G -J $_.job merged_lsdv_pipeline.sh $_\n"; }' | bash
-
-# Process all samples with 6 genomes
-more acc_list.txt | perl -e 'while(<>){ chomp; print "sbatch -c 20 --mem=50G -J $_.job merged_lsdv_pipeline.sh $_ 6genome\n"; }' | bash
+./lsdv_integrated_pipeline.sh <sample_name> <reference_type> <mapping_method>
 ```
 
 ### Parameters
 
-- `sample_name`: Base name of the sample (required)  
-- `reference_type`: Reference genome set to use (optional)  
-  - `1genome` (default): Single reference with vg support  
-  - `3genome`: Three reference genomes  
-  - `6genome`: Six reference genomes  
-  - `121genome`: 121 reference genomes  
+| Parameter | Type | Options | Description |
+|-----------|------|---------|-------------|
+| `sample_name` | String | Any valid sample ID | Sample identifier (e.g., SRR11470182) |
+| `reference_type` | Integer | 1, 3, 6, 121 | Number of reference genomes to use |
+| `mapping_method` | String | minimap2, giraffe, vgmap | Read alignment method |
 
----
+### Reference Types Explained
 
-## Pipeline Workflow
+- **1 genome**: Single reference genome (fastest, traditional approach)
+- **3 genomes**: Three representative genomes (balanced speed/accuracy)
+- **6 genomes**: Six diverse genomes (enhanced variant detection)
+- **121 genomes**: Full pangenome (most comprehensive, resource-intensive)
 
-1. **Setup and Configuration**
-   - Validates input parameters
-   - Configures reference genomes and file paths
-   - Sets up conditional processing flags
+### Mapping Methods Compared
 
-2. **Read Mapping**
-   - `minimap2`: Standard alignment for all reference types
-   - `vg giraffe`: Graph-based alignment with Giraffe
-   - Supports both paired-end and single-end reads
+| Method | Speed | Memory | Sensitivity | Best Use Case |
+|--------|-------|--------|-------------|---------------|
+| **minimap2** | Fastest | Low | Standard | Quick analysis, large datasets |
+| **giraffe** | Fast | Medium | High | Balanced performance |
+| **vgmap** | Slower | High | Highest | Maximum sensitivity |
 
-3. **BAM Processing**
-   - SAM to BAM conversion
-   - Coordinate sorting
-   - Duplicate marking and removal
-   - Indexing
+## Reference Genome Setup
 
-4. **Quality Control**
-   - `qualimap`: Comprehensive BAM quality assessment
-   - `samtools coverage`: Coverage statistics
-   - `samtools flagstat`: Alignment statistics
+### Graph Construction Commands
 
-5. **Variant Calling**
-   - `vg call`: Graph-based variant calling with VG
-   - `freebayes`: Haplotype-based variant detection
-   - `bcftools`: Consensus variant calling
+The pipeline includes commented sections for building graph indices. Uncomment and run these **once per reference type**:
 
-6. **Post-processing**
-   - VCF normalization and compression
-   - Indexing with `tabix`
-   - Variant count summaries
+#### For 1 Genome Reference
+```bash
+# Only requires FASTA indexing for minimap2
+samtools faidx 1genomes.fasta
+```
 
-7. **Consensus Generation**
-   - Reference and alternate consensus sequences
-   - Uses `bcftools consensus`
+#### For 3 Genome Reference
+```bash
+# Build pangenome graph
+pggb -i 3genomes.fasta -m -S -o LSDV3 -t 36 -p 90 -s 1k -n 3
 
----
+# Convert to VG format
+vg convert -t 12 -g LSDV3.gfa -v > LSDV3.vg
+vg autoindex -p LSDV3 -g LSDV3.gfa -t 22
+samtools faidx 3genomes.fasta
+vg convert LSDV3.xg -p > LSDV3.pg
+vg snarls LSDV3.pg > LSDV3.snarls
+vg index -j LSDV3.dist -s LSDV3.snarls LSDV3.xg
+
+# Additional indices for Giraffe
+vg gbwt --gbz-format -g LSDV3.gbz -G LSDV3.gfa
+vg gbwt -o LSDV3.gbwt -Z LSDV3.gbz
+vg convert -x --drop-haplotypes LSDV3.gbz > LSDV3.xg
+vg minimizer LSDV3.gbz -d LSDV3.dist -o LSDV3.min
+```
+
+#### For 6 and 121 Genome References
+Similar commands with appropriate parameters (see pipeline comments for details).
+
+### File Organization
+
+Reference files should be placed in the pipeline root directory:
+```
+lsdv-pipeline/
+├── 1genomes.fasta
+├── 3genomes.fasta
+├── 6genomes.fasta
+├── LSDV_genomes.fasta
+├── LSDV1.xg, LSDV1.gcsa, etc.
+├── LSDV3.xg, LSDV3.gcsa, etc.
+└── ... (other index files)
+```
 
 ## Output Structure
 
-The pipeline creates the following output directories:
+The pipeline creates method and reference-specific output directories:
 
 ```
-├── GAM_FILES/              # vg alignment files
-├── GAM_FILES2/             # Secondary vg alignments
-├── SAM_FILES/              # SAM alignment files
-├── BAM_FILES/              # Primary BAM files
-├── BAM_FILES2/             # Secondary BAM files
-├── VG_VCF_FILES/           # vg variant calls
-├── FB_VCF_FILES/           # FreeBayes variant calls
-├── FB_VCF_FILES2/          # Secondary FreeBayes calls
-├── BCF_VCF_FILES/          # BCFtools variant calls
-├── BCF_VCF_FILES2/         # Secondary BCFtools calls
-├── QUALIMAP/               # Quality control reports
-├── COVERAGE/               # Coverage statistics
-├── CONSENSUS/              # Consensus sequences
-├── ERROR_FILES/            # Error logs
-├── AUG/                    # Augmented graphs
-├── PACK_FILES/             # Packed coverage
-└── DEPTH_FILES/            # Depth information
+MINIMAP2_1GENOME/          # Minimap2 with 1 genome
+├── SAM_FILES/             # Alignment files (SAM format)
+├── BAM_FILES/             # Processed alignments
+├── FB_VCF_FILES/          # FreeBayes variant calls
+├── BCF_VCF_FILES/         # BCFtools variant calls
+├── CONSENSUS/             # Consensus sequences
+├── COVERAGE/              # Coverage statistics
+├── QUALIMAP/              # Quality reports
+├── ERROR_FILES/           # Error logs
+└── STATS/                 # Summary statistics
+
+GIRAFFE_3GENOME/           # VG Giraffe with 3 genomes
+├── GAM_FILES/             # Graph alignment files
+├── BAM_FILES/             # BAM alignments
+├── VG_VCF_FILES/          # VG variant calls
+├── FB_VCF_FILES/          # FreeBayes variant calls
+├── BCF_VCF_FILES/         # BCFtools variant calls
+├── AUG/                   # Augmented graphs
+├── PACK_FILES/            # Pileup data
+├── DEPTH_FILES/           # Depth information
+└── ... (other directories)
+
+VGMAP_121GENOME/           # VG Map with 121 genomes
+└── ... (similar structure)
 ```
 
----
-
-## Key Output Files
+### Key Output Files
 
 For each sample, the pipeline generates:
 
-- **Alignments**: `BAM_FILES/{sample}.rmdup.sorted.bam`  
-- **Variants**:
-  - `FB_VCF_FILES/{sample}.norm.fb.vcf.gz` (FreeBayes)
-  - `BCF_VCF_FILES/{sample}.norm.bcf.vcf.gz` (BCFtools)
-  - `VG_VCF_FILES/{sample}.norm.vg.vcf.gz` (VG)
-- **Quality**: `QUALIMAP/{sample}/qualimapReport.html`  
-- **Coverage**: `COVERAGE/{sample}.coverage.txt`  
-- **Consensus**:
-  - `CONSENSUS/{sample}.LA.fasta` (reference allele)
-  - `CONSENSUS/{sample}.LR.fasta` (alternate allele)
+| File Type | Location | Description |
+|-----------|----------|-------------|
+| Final BAM | `BAM_FILES/{sample}.rmdup.sorted.bam` | Processed, deduplicated alignments |
+| VG Variants | `VG_VCF_FILES/{sample}.norm.vg.vcf.gz` | Graph-based variant calls |
+| FreeBayes Variants | `FB_VCF_FILES/{sample}.norm.fb.vcf.gz` | FreeBayes variant calls |
+| BCFtools Variants | `BCF_VCF_FILES/{sample}.norm.bcf.vcf.gz` | BCFtools variant calls |
+| Coverage Stats | `COVERAGE/{sample}.coverage.txt` | Coverage statistics |
+| Quality Report | `QUALIMAP/{sample}/` | Detailed quality metrics |
+| Consensus Ref | `CONSENSUS/{sample}.LA.fasta` | Reference allele consensus |
+| Consensus Alt | `CONSENSUS/{sample}.LR.fasta` | Alternate allele consensus |
+| Summary | `STATS/{sample}_summary.txt` | Pipeline summary |
 
----
+## Variant Calling Methods
 
-## Monitoring and Troubleshooting
+### VG (Graph-based)
+- **Availability**: Only with `giraffe` and `vgmap` methods
+- **Approach**: Graph-augmented variant calling
+- **Strengths**: Handles complex structural variants, population-aware
+- **Best for**: Comprehensive variant discovery in diverse populations
+
+### FreeBayes
+- **Availability**: All mapping methods
+- **Approach**: Bayesian genetic variant detector
+- **Strengths**: Good sensitivity for SNPs and small indels
+- **Best for**: Standard variant discovery workflows
+
+### BCFtools
+- **Availability**: All mapping methods  
+- **Approach**: Samtools mpileup + bcftools call
+- **Strengths**: Fast, reliable for high-coverage data
+- **Best for**: Quick variant calling, consensus generation
+
+### Variant Normalization
+
+All VCF files are normalized using `bcftools norm`:
+- Left-alignment of indels
+- Splitting of multiallelic sites
+- Consistent representation
+
+## Batch Processing
+
+### SLURM Integration
+
+The pipeline includes ready-to-use SLURM submission commands:
+
+#### Process all samples with different methods:
+
+```bash
+# All samples with Giraffe mapping to 3 genomes
+more acc_list.txt | perl -e 'while(<>){ chomp; print "sbatch -c 20 --mem=50G -J $_.giraffe.job lsdv_integrated_pipeline.sh $_ 3 giraffe\n"; }'
+
+# All samples with Minimap2 mapping to single genome  
+more acc_list.txt | perl -e 'while(<>){ chomp; print "sbatch -c 20 --mem=50G -J $_.minimap2.job lsdv_integrated_pipeline.sh $_ 1 minimap2\n"; }'
+
+# All samples with VG Map to 121 genomes (high memory)
+more acc_list.txt | perl -e 'while(<>){ chomp; print "sbatch -c 40 --mem=250G -J $_.vgmap.job lsdv_integrated_pipeline.sh $_ 121 vgmap\n"; }'
+```
+
+#### Method comparison for single sample:
+```bash
+SAMPLE="SRR11470182"
+for METHOD in minimap2 giraffe vgmap; do
+    for REF in 1 3 6 121; do
+        sbatch -c 20 --mem=50G -J ${SAMPLE}.${METHOD}.${REF}g.job \
+            lsdv_integrated_pipeline.sh $SAMPLE $REF $METHOD
+    done
+done
+```
+
+### Resource Requirements by Configuration
+
+| Reference | Method | CPUs | Memory | Time (est.) |
+|-----------|--------|------|---------|-------------|
+| 1 genome | minimap2 | 20 | 16GB | 30-60 min |
+| 1 genome | giraffe | 20 | 32GB | 45-90 min |
+| 3 genomes | giraffe | 20 | 50GB | 60-120 min |
+| 6 genomes | giraffe | 20 | 64GB | 90-180 min |
+| 121 genomes | vgmap | 40 | 250GB | 4-8 hours |
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Input Files Not Found
+```
+Error: No valid input files found for sample SRRXXXXXX
+```
+**Solution**: Verify input files exist in the expected location and follow naming convention.
+
+#### 2. Memory Issues
+```
+Error: Job killed due to memory limit
+```
+**Solution**: Increase memory allocation, especially for 121-genome reference:
+```bash
+sbatch -c 40 --mem=250G ...  # For 121 genomes
+```
+
+#### 3. Graph Index Missing
+```
+Error: Could not open LSDV3.xg
+```
+**Solution**: Build graph indices first (see [Reference Genome Setup](#reference-genome-setup)).
+
+#### 4. VG Tools Not Found
+```
+Command 'vg' not found
+```
+**Solution**: Install VG toolkit and ensure it's in PATH:
+```bash
+# Check VG installation
+which vg
+vg version
+
+# If not installed, use conda:
+conda install -c bioconda vg
+```
+
+### Debug Mode
+
+Enable verbose logging by modifying the script:
+```bash
+# Add at the top of the script
+set -x  # Enable debug mode
+set -e  # Exit on error
+```
 
 ### Log Files
 
-- Check `ERROR_FILES/` for detailed error logs  
-- Each processing step generates specific error files  
-- SLURM job logs provide additional debugging information  
-
-### Debugging
-
-```bash
-# Check if input files exist
-ls -la /mnt/lustre/RDS-archive/downing/LSDV/KRAKEN_VALID_FILES/{sample}*
-
-# Monitor running jobs
-squeue -u $USER
-
-# Check specific error logs
-tail -f ERROR_FILES/{sample}.*.errors.txt
-```
-
----
+Check error logs in the `ERROR_FILES/` directory:
+- `{sample}.sam.errors.txt` - Mapping errors
+- `{sample}.vg.errors.txt` - VG variant calling errors  
+- `{sample}.fb.errors.txt` - FreeBayes errors
+- `{sample}.cov.errors.txt` - Coverage calculation errors
 
 ## Performance Considerations
 
-- **CPU usage**: Pipeline uses 10+ cores per job  
-- **Memory**: 50GB+ recommended for large reference sets  
-- **Storage**: Ensure sufficient disk space for intermediate files  
-- **Network**: Consider data locality for large-scale processing  
+### Optimization Tips
 
----
+1. **Choose appropriate reference size**:
+   - Use 1 genome for quick analysis
+   - Use 3-6 genomes for balanced performance
+   - Use 121 genomes only when maximum sensitivity is required
 
-## Customization
+2. **Select optimal mapping method**:
+   - `minimap2`: Fastest, good for large datasets
+   - `giraffe`: Best balance of speed and accuracy
+   - `vgmap`: Most comprehensive but slowest
 
-The script can be customized by modifying:
+3. **Resource allocation**:
+   - Scale CPU and memory based on reference size
+   - Use SSDs for temporary files when possible
+   - Consider I/O bottlenecks for large datasets
 
-- Reference paths: Update `fasta` and `fasta2` variables  
-- Tool parameters: Adjust variant calling parameters  
-- Resource allocation: Modify SLURM parameters  
-- Output locations: Change directory paths as needed  
+4. **Batch processing**:
+   - Process samples in parallel when resources allow
+   - Use job arrays for large sample sets
+   - Monitor resource usage with `squeue` and `sstat`
 
----
+### Storage Requirements
+
+Approximate storage per sample:
+
+| Reference | Method | Temp Files | Final Output |
+|-----------|--------|------------|--------------|
+| 1 genome | minimap2 | 2-5 GB | 500 MB |
+| 3 genomes | giraffe | 5-10 GB | 1-2 GB |
+| 121 genomes | vgmap | 20-50 GB | 5-10 GB |
+
+### Cleanup Recommendations
+
+The pipeline automatically removes intermediate files, but consider:
+- Archiving old results periodically
+- Using scratch space for temporary files
+- Implementing automated cleanup scripts
+
+## Advanced Usage
+
+### Custom Reference Genomes
+
+To use custom reference genomes:
+
+1. **Prepare FASTA files**:
+```bash
+# Ensure proper naming
+mv your_genome.fasta 1genomes.fasta
+samtools faidx 1genomes.fasta
+```
+
+2. **Build graph indices** (for graph methods):
+```bash
+# Follow the graph construction commands in the pipeline
+```
+
+3. **Update pipeline configuration** if needed
+
+### Integrating with Other Pipelines
+
+The pipeline outputs standard formats (BAM, VCF) compatible with:
+- Variant annotation tools (SnpEff, VEP)
+- Population genetics software (PLINK, VCFtools)
+- Phylogenetic analysis tools (IQ-TREE, RAxML)
+
+### Custom Variant Filtering
+
+Post-process VCF files with custom filters:
+```bash
+# Example: Filter by quality and depth
+bcftools filter -e 'QUAL<30 || DP<10' input.vcf.gz > filtered.vcf
+```
+
+## Best Practices
+
+### Data Management
+- Maintain consistent sample naming conventions
+- Document processing parameters for reproducibility
+- Backup critical results and intermediate files
+- Use version control for analysis scripts
+
+### Quality Control
+- Always review Qualimap reports
+- Check mapping statistics in GAM files
+- Validate consensus sequences
+- Compare results across different methods
+
+### Reproducibility  
+- Record software versions used
+- Document reference genome sources
+- Save parameter files and run logs
+- Use containerization when possible
+
+## Contributing
+
+We welcome contributions to improve the LSDV pipeline! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with appropriate tests
+4. Update documentation as needed
+5. Submit a pull request
+
+### Development Guidelines
+- Follow bash scripting best practices
+- Include error handling and logging
+- Update this README for new features
+- Test changes with different configurations
+
+### Reporting Issues
+- Use GitHub Issues for bug reports
+- Include sample data and error logs when possible
+- Specify software versions and system configuration
 
 ## Citation
 
 If you use this pipeline in your research, please cite:
 
-- The original tools used (`minimap2`, `vg`, `freebayes`, `bcftools`, etc.)  
-- Your LSDV research publication  
-- This pipeline (if published)
+```
+LSDV Integrated Variant Calling Pipeline
+[Your Name et al.]
+GitHub repository: https://github.com/your-org/lsdv-pipeline
+Version: 1.0.0
+```
 
----
+Also cite the underlying tools:
+- **VG**: Garrison et al. (2018) Nature Biotechnology
+- **Minimap2**: Li (2018) Bioinformatics  
+- **FreeBayes**: Garrison & Marth (2012) arXiv
+- **BCFtools**: Danecek et al. (2021) GigaScience
+- **SAMtools**: Li et al. (2009) Bioinformatics
 
-## Contributing
+## License
 
-1. Fork the repository  
-2. Create a feature branch  
-3. Make your changes  
-4. Add tests if applicable  
-5. Submit a pull request  
-
----
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For questions or issues:
-
-- Open an issue on GitHub  
-- Check the troubleshooting section  
-- Review error logs in `ERROR_FILES/`
-
----
+For support and questions:
+- Create an issue on GitHub
+- Contact the development team
+- Check the troubleshooting section above
 
 ## Changelog
 
-### Version 1.0
-- Initial release
+### Version 1.0.0 (Current)
+- Initial integrated pipeline release
+- Support for three mapping methods
+- Multiple reference genome configurations
+- Comprehensive variant calling workflow
+- SLURM integration and batch processing
+- Quality control and consensus generation
+
+---
+
+**Last Updated**: December 2024  
+**Pipeline Version**: 1.0.0  
+**Compatibility**: Linux systems with standard bioinformatics tools
