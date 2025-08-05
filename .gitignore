@@ -1,0 +1,8 @@
+# .gitignore content
+data/
+results/
+*.Rproj
+*.DS_Store
+*.log
+*.out
+*~
