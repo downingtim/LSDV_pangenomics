@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 #
-# PURPOSE: Analyzes and visualizes allele frequencies from heterozygosity data.
+# PURPOSE: Analyses and visualises allele frequencies from heterozygosity data.
 #          It processes .vcf.het files from multiple experiments and generates
 #          summary plots. This script consolidates the logic from the original
 #          11_heterzygosity.R and 18_heterozygosity1.R files.
@@ -9,11 +9,6 @@
 # Rscript 11_analyze_heterozygosity.R --metadata metadata2.csv \
 #                                     --input_dir ./ \
 #                                     --output_dir ./het_plots
-#
-# DESCRIPTION:
-# The script loops through subfolders matching "SCREENED_MERGED_*" in the
-# input directory, reads .vcf.het files for each sample in the metadata,
-# and generates faceted plots of allele frequency.
 
 # --- Load Libraries ---
 library(optparse)
