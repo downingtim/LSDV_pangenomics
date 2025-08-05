@@ -1,30 +1,34 @@
-Variant Effect Predictor
+## Variant Effect Predictor
+
 A tool for predicting the effects of genomic variants on protein-coding genes, focusing on synonymous and nonsynonymous changes.
 
-Overview
+## Overview
+
 This tool analyzes Variant Call Format (VCF) files to determine the effects of SNPs (Single Nucleotide Polymorphisms) on protein-coding genes. It uses a reference genome (FASTA) and gene annotations (GenBank) to:
 
-Identify if variants fall within coding regions
-Determine if coding variants cause amino acid changes
-Classify variants as:
+# Identify if variants fall within coding regions
+# Determine if coding variants cause amino acid changes
+
+# Classify variants as:
 Synonymous (no amino acid change)
 Nonsynonymous (amino acid change)
 Stop gain (introducing a premature stop codon)
 Stop loss (removing a stop codon)
 Intergenic (not in a coding region)
-Requirements
+
+# Requirements
 Python 3.6+
 BioPython
 pandas (for batch processing)
 matplotlib and seaborn (for visualization)
 
-Install dependencies:
+# Install dependencies:
  pip install biopython pandas matplotlib seaborn
 
-Usage - Processing a Single VCF File
+# Usage - Processing a Single VCF File
  python vep.py INPUT.vcf REFERENCE.fasta ANNOTATION.gbk -o OUTPUT.tsv
 
-Arguments:
+# Arguments:
 INPUT.vcf: Input variant file in VCF format
 REFERENCE.fasta: Reference genome in FASTA format
 ANNOTATION.gbk: Gene annotation file in GenBank format
