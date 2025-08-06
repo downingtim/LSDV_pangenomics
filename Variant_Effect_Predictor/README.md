@@ -5,22 +5,20 @@ A tool for predicting the effects of genomic variants on protein-coding genes, f
 ## Overview
 
 This tool analyzes Variant Call Format (VCF) files to determine the effects of SNPs (Single Nucleotide Polymorphisms) on protein-coding genes. It uses a reference genome (FASTA) and gene annotations (GenBank) to:
+  [1] Identify if variants fall within coding regions
+  [2] Determine if coding variants cause amino acid changes
+  [3] Classify variants as:
+      Synonymous (no amino acid change)
+      Nonsynonymous (amino acid change)
+      Stop gain (introducing a premature stop codon)
+      Stop loss (removing a stop codon)
+      Intergenic (not in a coding region)
 
-# Identify if variants fall within coding regions
-# Determine if coding variants cause amino acid changes
-
-# Classify variants as:
-Synonymous (no amino acid change)
-Nonsynonymous (amino acid change)
-Stop gain (introducing a premature stop codon)
-Stop loss (removing a stop codon)
-Intergenic (not in a coding region)
-
-# Requirements
-Python 3.6+
-BioPython
-pandas (for batch processing)
-matplotlib and seaborn (for visualization)
+# Requirements:
+  Python 3.6+
+  BioPython
+  pandas (for batch processing)
+  matplotlib and seaborn (for visualization)
 
 # Install dependencies:
  pip install biopython pandas matplotlib seaborn
