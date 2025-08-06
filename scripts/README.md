@@ -48,12 +48,25 @@ To run the pipeline, first obtain the necessary input data. An example is provid
 
 The pipeline consists of several numbered scripts executed in sequence:
 
-1. **`01_quality_control.R`**: Performs quality control on raw reads using FastQC.
-2. **`02_run_mapping.sh`**: Maps reads to the pangenome graph using `vg giraffe`.
-3. **`03_process_alignments.sh`**: Sorts and indexes the resulting BAM/GAM files.
-4. **`04_call_variants.sh`**: Calls SNPs and structural variants from the alignments.
-5. **`05_annotate_variants.py`**: Annotates variants using Variant Effect Predictor (VEP).
-6. **`06_generate_figures.R`**: Creates summary plots and figures for publication.
+1. **`01_qc.R`**: Performs quality control analysis on coverage data and generates QC plots
+2. **`02_BAM_GAM_metrics.pl`**: Extracts SNP counts and alignment metrics from VCF, BAM, and GAM files
+3. **`03_generate_summary_plots.R`**: Generates summary boxplots comparing variant callers and mapping strategies
+4. **`04_*` **: <removed>
+5. **`05_get_liftover.py`**: Extracts liftover failure statistics from log files
+6. **`06_get_liftover.R`**: Visualizes liftover failure rates across samples
+7. **`07_get_stats.pl`**: Calculates Transition/Transversion (Ti/Tv) ratios from VCF files
+8. **`08_*`**: <removed>
+9. **`09_plot_sites.screened.R`**: Visualizes genomic locations of filtered variants
+10. **`10_finalise_snps.pl`**: Performs final SNP merging across callers and mappers
+11. **`11_analyze_heterozygosity.R`**: Analyzes and visualizes allele frequencies from heterozygosity data
+12. **`12_finalise_snps.R`**: Creates scatter plots comparing SNP counts between mapping methods
+13. **`13_get.titv.ratios.R`**: Calculates and analyzes Ti/Tv ratios
+14. **`14_get_snps.R`**: Aggregates statistics from multiple sources into comprehensive summary
+15. **`15_plot_coverage.R`**: Investigates correlation between coverage and SNP detection
+16. **`16_plot_snp_overlap.all.R`**: Visualizes SNP overlap between Minimap2 and PVG approaches
+17. **`17_get.ratios.R`**: Calculates Ti/Tv ratios from screened and unscreened results
+18. **`18_plot_snp_frequency_Figure2.R`**: Generates Figure 2 - mutation density across genome with CDS annotation
+19. **`19_snp_variation_Figure5.R`**: Generates Figure 5 - multi-panel SNP distribution and method comparison
 
 ## Data Preparation & QC (Scripts 01-02)
 
@@ -89,7 +102,7 @@ perl 02_BAM_GAM_metrics.pl --datadir <path/to/LSDV_data> --outdir <path/to/outpu
 
 ## Core Analysis & Plotting (Scripts 03-18)
 
-### SCRIPT: 03_generate_summary_plots.R (Consolidates 03, 04, 08)
+### SCRIPT: 03_generate_summary_plots.R (Consolidates 03, 04 and 08)
 
 **PURPOSE:** Reads various statistics files (SNPS, GAMSTATS, BAMSTATS, TSTV) and generates numerous summary boxplots comparing performance across different variant callers and mapping strategies.
 
@@ -256,13 +269,13 @@ Rscript 17_get.ratios.R --datadir <path/to/project> --metadata <path/to/metadata
 
 ## Publication Figure Scripts
 
-### SCRIPT: plot_snp_frequency_Figure2.R
+### SCRIPT: 18_plot_snp_frequency_Figure2.R
 
 **PURPOSE:** Generates Figure 2 for publication, showing mutation density across the genome aligned with an annotation of coding sequences (CDS).
 
 **USAGE:**
 ```bash
-Rscript plot_snp_frequency_Figure2.R --vcf <path/to/vcf> --genbank <path/to/genbank> --output_pdf <output.pdf>
+Rscript 18_plot_snp_frequency_Figure2.R --vcf <path/to/vcf> --genbank <path/to/genbank> --output_pdf <output.pdf>
 ```
 
 **ARGUMENTS:**
@@ -270,13 +283,13 @@ Rscript plot_snp_frequency_Figure2.R --vcf <path/to/vcf> --genbank <path/to/genb
 - `--genbank`: Path to the input GenBank annotation file (e.g., KX894508.gb).
 - `--output_pdf`: Path for the final PDF figure.
 
-### SCRIPT: snp_variation_Figure5.R
+### SCRIPT: 19_snp_variation_Figure5.R
 
 **PURPOSE:** Generates the complex, multi-panel Figure 5 for publication, showing SNP distribution, method comparison, and zoomed-in views of specific genomic regions.
 
 **USAGE:**
 ```bash
-Rscript snp_variation_Figure5.R --vcf_dir <path/to/final_vcfs> --unique_snp_dir <path/to/unique_snps> --output_pdf <output.pdf>
+Rscript 19_snp_variation_Figure5.R --vcf_dir <path/to/final_vcfs> --unique_snp_dir <path/to/unique_snps> --output_pdf <output.pdf>
 ```
 
 **ARGUMENTS:**
