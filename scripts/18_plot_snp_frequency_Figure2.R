@@ -103,8 +103,10 @@ tree_plot <- ggplot(bin_counts, aes(x = midpoint, y = count)) +
           alpha = 0.3, inherit.aes = FALSE) + scale_fill_identity() +
   geom_col(fill = "steelblue") +
   # Add horizontal reference lines for median and 95th percentile
-  geom_hline(yintercept = median_val, linetype = "dashed", color = "red", alpha = 0.5) +
-  geom_hline(yintercept = top5_val, linetype = "dashed", color = "black", alpha = 0.5) +
+  geom_hline(yintercept = median_val, linetype = "dashed", color = "red",
+  			linewidth = 2, alpha = 0.5) +
+  geom_hline(yintercept = top5_val, linetype = "dashed", color = "black",
+  			linewidth = 2, alpha = 0.5) +
   # Add region labels
   geom_text(data = regions,
             aes(x = label_x, y = label_y, label = region, color=color),
@@ -115,7 +117,7 @@ scale_x_continuous(name = "Genome Position (Kb)",
                   minor_breaks = seq(0, genome_length, by = 2500),
                   labels = seq(0, genome_length, by = 5000) / 1000) +
 		  scale_color_identity() + 
-  scale_y_continuous(name = "Mutations per Kb") +  
+  scale_y_continuous(name = "mutations/Kb") +  
   # Apply minimal theme
   theme_minimal() +
   # Customize grid lines
@@ -198,7 +200,7 @@ scale_x_continuous(name = "Genome Position (Kb)",
 final_plot <- tree_plot / cds_plot + plot_layout(heights = c(4, 1))
 
 # Save combined plot as PDF
-ggsave("PVG_paper_Figure2.pdf", final_plot, width = 16, height = 5)
+ggsave("PVG_paper_Figure2.pdf", final_plot, width = 13, height = 5)
 
 # Outputs
 # 1. bin_counts.csv - Contains the raw data for mutation counts per bin
