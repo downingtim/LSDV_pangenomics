@@ -59,9 +59,6 @@ If you use this workflow or its components in your research, please cite this re
 
 Caroline Wright, Chandana Tennakoon, Lidia Dykes, Tim Downing. Using pangenome variation graphs to improve mutation detection in a large DNA virus. 2025. https://github.com/downingtim/LSDV_pangenomics/
 
-<img width="468" height="55" alt="image" src="https://github.com/user-attachments/assets/03dd92bd-b015-4bb3-a0da-0747a613a493" />
-
-
 ## License
 
 This project is licensed under the MIT License.
