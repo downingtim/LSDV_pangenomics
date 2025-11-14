@@ -57,6 +57,8 @@ The best place to begin is with the read mapping workflow.
 
 If you use this workflow or its components in your research, please cite this repository. Additionally, please cite the underlying tools used in each part of the pipeline (e.g., VG, Minimap2, FreeBayes), as detailed in the README files of the respective sub-directories.
 
+Caroline Wright, Chandana Tennakoon, Lidia Dykes, Tim Downing. Using pangenome variation graphs to improve mutation detection in a large DNA virus. 2025. https://github.com/downingtim/LSDV_pangenomics/
+
 ## License
 
 This project is licensed under the MIT License.
