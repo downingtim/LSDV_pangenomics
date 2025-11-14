@@ -128,7 +128,7 @@ for (i in seq_along(regions)) {
       geom_jitter(alpha = 0.5, size = 2, width=1) +
       scale_color_manual(values = my_colors) + ylim(0,15)+
       labs(        x = "Position", y = "Count",
-        title = paste(region_start, "-", region_end)      ) +
+        title = paste("Region ", i)      ) +
       my_theme +      theme(legend.position = "none",
             plot.title = element_text(size = 10, hjust = 0.5)) +
                   scale_x_continuous(limits = c(region_start, region_end))
