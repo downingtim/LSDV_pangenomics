@@ -26,6 +26,7 @@ This tool analyzes Variant Call Format (VCF) files to determine the effects of S
 
 ```bash
 pip install biopython pandas matplotlib seaborn
+# use conda instead
 ```
 
 ## Usage
@@ -46,7 +47,7 @@ python vep.py INPUT.vcf REFERENCE.fasta ANNOTATION.gbk -o OUTPUT.tsv
 ### Processing Multiple VCF Files
 
 ```bash
-python batch.py --vcf_dir /path/to/vcfs --fasta REFERENCE.fasta --genbank ANNOTATION.gbk --output_dir results
+python batch.py --vcf_dir /path/to/vcfs  --pattern "*.vcf.gz" --fasta REFERENCE.fasta --genbank ANNOTATION.gbk --output_dir results
 ```
 
 #### Arguments:

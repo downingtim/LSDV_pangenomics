@@ -12,13 +12,19 @@ from collections import defaultdict, Counter
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Data import CodonTable
+import gzip
 
 
 def parse_vcf(vcf_file):
     """Parse a VCF file and extract variants."""
     variants = []
     
-    with open(vcf_file, 'r') as f:
+    if vcf_file.endswith(".gz"):
+        f = gzip.open(vcf_file, "rt")
+    else:
+        f = open(vcf_file)
+
+            
         for line in f:
             if line.startswith('#'):
                 continue

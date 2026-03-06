@@ -21,7 +21,7 @@ def process_single_vcf(vcf_file, fasta_file, genbank_file, output_dir):
     output_file = os.path.join(output_dir, f"{base_name}_effects.tsv")
     
     # Call the variant effect predictor script
-    cmd = ["python", "vep.py", vcf_file, fasta_file, genbank_file, "-o", output_file]    
+    cmd = ["python", "vep1.py", vcf_file, fasta_file, genbank_file, "-o", output_file]    
     try:
         subprocess.run(cmd, check=True)
         return output_file

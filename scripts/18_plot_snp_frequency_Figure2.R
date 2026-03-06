@@ -20,10 +20,11 @@
 #
 # PARAMETERS:
 # - genome_length: 151,000 bp (total genome length)
-# - window_size: 400 bp (size of bins for density analysis)
 #
 # =============================================================================
 
+# BiocManager::install("genbankr")
+# BiocManager::install("VariantAnnotation", force = TRUE, dependencies = TRUE)
 library(VariantAnnotation)  # For reading and processing VCF files
 library(ggplot2)           # For creating plots
 library(dplyr)             # For data manipulation
@@ -31,43 +32,21 @@ library(scales)            # For formatting plot scales (comma formatting)
 library(genbankr)          # For reading GenBank files
 library(patchwork)         # For combining multiple plots
 
-# =============================================================================
-# READ AND PROCESS VCF FILE
-# =============================================================================
-
 # Read VCF file containing genetic variants
 vcf <- readVcf("vcf/gfavariants.vcf")
-
 # Filter for SNVs (Single Nucleotide Variants) only
 vcf_snv <- vcf[isSNV(vcf)]
-
-# Override filter to include all mutations (not just SNVs)
-# Comment: This line overwrites the SNV filtering - decide if you want only SNVs or all variants
-vcf_snv <- vcf # all mutations
-
 # Extract genomic positions of variants
-positions <- start(rowRanges(vcf_snv))
+positions <- unique(start(rowRanges(vcf_snv)) )
 
-# =============================================================================
-# BINNING ANALYSIS
-# =============================================================================
-
-# Define genome parameters
 genome_length <- 151000  # Total genome length in base pairs
-window_size <- 400       # Size of each bin in base pairs
+window_size <- 250       # Size of each bin in base pairs
 
-# Create bins for the entire genome
-# cut() divides positions into bins of specified size
-bins <- cut(positions, breaks = seq(0, genome_length, by = window_size), right = FALSE)
+window_number <- floor((positions - 1) / window_size) + 1
+# Count how many positions in each window
+bin_counts <- as.data.frame(table(window_number))
 
-# Count number of variants in each bin
-bin_counts <- as.data.frame(table(bins))
-
-# Parse bin information to get start positions
-# Remove brackets and extract start coordinate from bin names
-bin_counts$start <- as.numeric(gsub("\\[|\\)|\\]", "", sapply(strsplit(as.character(bin_counts$bins), ","), "[[", 1)))
-
-# Calculate end position and midpoint for each bin
+bin_counts$start <- (as.numeric(as.character(bin_counts$window_number)) - 1) * window_size
 bin_counts$end <- bin_counts$start + window_size
 bin_counts$midpoint <- bin_counts$start + window_size / 2
 
@@ -77,24 +56,22 @@ colnames(bin_counts)[2] <- "count"
 # Calculate summary statistics
 median_val <- median(bin_counts$count)  # Median number of mutations per bin
 top5_val <- quantile(bin_counts$count, 0.95)  # 95th percentile (top 5%)
-
 # Export bin counts to CSV for further analysis
 write.csv(bin_counts, "bin_counts.csv")
+print(median_val)
 
-# =============================================================================
 # CREATE MUTATION DENSITY PLOT WITH HIGHLIGHTED REGIONS
-# =============================================================================
 
 # Define regions of interest to highlight
 regions <- data.frame(
-  region = c("Region1", "Region2", "Region3"),
-  start = c(5000, 7950, 136000),
-  end = c(6700, 8360, 141000),
-  color = c("#FFA500", "#FFA500", "#FFA500"),  # Orange, Sky Blue, Pale Green
-  label_x = c(5500, 8230, 135500),  # Center positions for labels
-  label_y = c(max(bin_counts$count) * 0.87,  # Position labels near top
-              max(bin_counts$count) * 0.96,
-              max(bin_counts$count) * 0.95) )
+  region = c("Region 1", "Region 2", "Region 3"),
+  start = c(5000, 7900, 136000),
+  end = c(6700, 8400, 141000),
+  color = c("#ff5500", "#ff8400", "#ff6600"),  # Orange, Sky Blue, Pale Green
+  label_x = c(-1000, 12400, 129000),  # Center positions for labels
+  label_y = c(max(bin_counts$count) * 0.97,  # Position labels near top
+              max(bin_counts$count) * 0.98,
+              max(bin_counts$count) * 0.97) )
 
 # Create main plot showing mutation density across genome
 tree_plot <- ggplot(bin_counts, aes(x = midpoint, y = count)) +  
@@ -104,9 +81,9 @@ tree_plot <- ggplot(bin_counts, aes(x = midpoint, y = count)) +
   geom_col(fill = "steelblue") +
   # Add horizontal reference lines for median and 95th percentile
   geom_hline(yintercept = median_val, linetype = "dashed", color = "red",
-  			linewidth = 2, alpha = 0.5) +
+  			linewidth = 2, alpha = 0.4) +
   geom_hline(yintercept = top5_val, linetype = "dashed", color = "black",
-  			linewidth = 2, alpha = 0.5) +
+  			linewidth = 2, alpha = 0.4) +
   # Add region labels
   geom_text(data = regions,
             aes(x = label_x, y = label_y, label = region, color=color),
@@ -117,24 +94,16 @@ scale_x_continuous(name = "Genome Position (Kb)",
                   minor_breaks = seq(0, genome_length, by = 2500),
                   labels = seq(0, genome_length, by = 5000) / 1000) +
 		  scale_color_identity() + 
-  scale_y_continuous(name = "mutations/Kb") +  
-  # Apply minimal theme
-  theme_minimal() +
-  # Customize grid lines
+  scale_y_continuous(name = "mutations/Kb") +  theme_minimal() +
   theme(panel.grid.minor = element_line(size = 0.3),
-        panel.grid.major = element_line(size = 0.6),
+        panel.grid.major = element_line(size = 0.5),
         panel.grid.major.x = element_line(color = "gray70"),
         panel.grid.minor.x = element_line(color = "gray85"))
 
-# Note: Individual density plot creation removed - only combined plot will be generated
-
-# =============================================================================
 # READ AND PROCESS GENBANK ANNOTATION
-# =============================================================================
 
 # Read GenBank file containing genome annotations
 gb <- readGenBank("KX894508.gb")
-
 # Extract CDS (Coding Sequence) features from GenBank file
 cds_data <- gb@cds %>%  
   as.data.frame() %>%
@@ -144,9 +113,7 @@ cds_data <- gb@cds %>%
          # Set y-coordinate based on strand for visual separation
          y = ifelse(strand == "+", 1, -1))
 
-# =============================================================================
 # CREATE CDS ANNOTATION PLOT WITH HIGHLIGHTED GENES
-# =============================================================================
 
 # Define genes of interest to highlight (corresponding to the regions above)
 highlighted_genes <- c("LD008", "LD009", "LD011", "LD012",
@@ -198,11 +165,11 @@ scale_x_continuous(name = "Genome Position (Kb)",
 # Combine mutation density plot with CDS annotation plot
 # Heights argument controls relative size (4:1 ratio)
 final_plot <- tree_plot / cds_plot + plot_layout(heights = c(4, 1))
-
 # Save combined plot as PDF
 ggsave("PVG_paper_Figure2.pdf", final_plot, width = 13, height = 5)
+ggsave("PVG_paper_Figure2.png", final_plot, width = 13, height = 5)
 
 # Outputs
 # 1. bin_counts.csv - Contains the raw data for mutation counts per bin
 # 2. PVG_paper_Figure2.pdf - Combined mutation density and CDS annotation plot
-#    with highlighted regions and genes
+#    with highlighted regions and genes of interest
